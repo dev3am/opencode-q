@@ -1,0 +1,40 @@
+{
+  "name": "opencode-q",
+  "version": "1.0.0",
+  "description": "Prompt queue plugin for OpenCode",
+  "type": "module",
+  "main": "./dist/plugin.js",
+  "bin": {
+    "opencode-q": "./dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/plugin.js"
+  },
+  "files": [
+    "dist/"
+  ],
+  "engines": {
+    "opencode": "^1.0.0"
+  },
+  "scripts": {
+    "build": "bun run build:plugin && bun run build:cli && bun run build:web",
+    "build:plugin": "bun build src/plugin.ts --outfile dist/plugin.js --target bun",
+    "build:cli": "bun build cli/index.ts --outfile dist/cli.js --target bun && bun -e \"const f=require('fs');const c=f.readFileSync('dist/cli.js','utf8');f.writeFileSync('dist/cli.js','#!/usr/bin/env bun\\n'+c)\"",
+    "build:web": "cd web && bun run build && cp -r dist ../dist/web",
+    "test": "bun test",
+    "dev": "bun run build && echo 'Built to dist/'"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "latest"
+  },
+  "devDependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@types/bun": "latest",
+    "@vitejs/plugin-react": "^6.0.2",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "vite": "^8.0.14"
+  }
+}
