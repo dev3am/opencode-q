@@ -1,6 +1,6 @@
 {
   "name": "opencode-q",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Prompt queue plugin for OpenCode",
   "type": "module",
   "main": "./dist/plugin.js",
@@ -20,7 +20,7 @@
     "build": "bun run build:plugin && bun run build:cli && bun run build:web",
     "build:plugin": "bun build src/plugin.ts --outfile dist/plugin.js --target bun",
     "build:cli": "bun build cli/index.ts --outfile dist/cli.js --target bun && bun -e \"const f=require('fs');const c=f.readFileSync('dist/cli.js','utf8');f.writeFileSync('dist/cli.js','#!/usr/bin/env bun\\n'+c)\"",
-    "build:web": "cd web && bun run build && cp -r dist ../dist/web",
+    "build:web": "cd web && bun run build && rm -rf ../dist/web && cp -r dist ../dist/web",
     "test": "bun test",
     "dev": "bun run build && echo 'Built to dist/'"
   },
