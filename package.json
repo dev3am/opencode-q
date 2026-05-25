@@ -24,7 +24,7 @@
     "scripts/"
   ],
   "scripts": {
-    "postinstall": "node scripts/postinstall.js",
+    "postinstall": "node scripts/postinstall.cjs",
     "build": "bun run build:plugin && bun run build:cli && bun run build:web",
     "build:plugin": "bun build src/plugin.ts --outfile dist/plugin.js --target bun",
     "build:cli": "bun build cli/index.ts --outfile dist/cli.js --target bun && bun -e \"const f=require('fs');const c=f.readFileSync('dist/cli.js','utf8');f.writeFileSync('dist/cli.js','#!/usr/bin/env bun\\n'+c)\"",
