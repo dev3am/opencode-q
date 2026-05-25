@@ -1,7 +1,16 @@
 {
   "name": "opencode-q",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Prompt queue plugin for OpenCode",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "prompt-queue",
+    "ai",
+    "agent",
+    "task-queue",
+    "open-source"
+  ],
   "type": "module",
   "main": "./dist/plugin.js",
   "bin": {
@@ -11,12 +20,11 @@
     ".": "./dist/plugin.js"
   },
   "files": [
-    "dist/"
+    "dist/",
+    "scripts/"
   ],
-  "engines": {
-    "opencode": "^1.0.0"
-  },
   "scripts": {
+    "postinstall": "node scripts/postinstall.js",
     "build": "bun run build:plugin && bun run build:cli && bun run build:web",
     "build:plugin": "bun build src/plugin.ts --outfile dist/plugin.js --target bun",
     "build:cli": "bun build cli/index.ts --outfile dist/cli.js --target bun && bun -e \"const f=require('fs');const c=f.readFileSync('dist/cli.js','utf8');f.writeFileSync('dist/cli.js','#!/usr/bin/env bun\\n'+c)\"",
@@ -36,5 +44,14 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "vite": "^8.0.14"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dev3am/opencode-q.git"
+  },
+  "homepage": "https://github.com/dev3am/opencode-q#readme",
+  "bugs": {
+    "url": "https://github.com/dev3am/opencode-q/issues"
   }
 }

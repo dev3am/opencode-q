@@ -27,19 +27,15 @@
 - [Bun](https://bun.sh) 1.x
 - OpenCode 1.x
 
-### npm (once published)
+### npm
 
 ```bash
 npm install opencode-q
 ```
 
-Add to your `opencode.json`:
+The plugin auto-installs to `~/.config/opencode/plugins/` via postinstall. Just restart OpenCode and it works.
 
-```json
-{
-  "plugin": ["opencode-q"]
-}
-```
+> **Manual alternative:** Add to your project's `opencode.json`: `{ "plugin": ["opencode-q"] }`
 
 ## Usage
 

@@ -23,19 +23,15 @@
 - [Bun](https://bun.sh) 1.x
 - OpenCode 1.x
 
-### npm (发布后)
+### npm
 
 ```bash
 npm install opencode-q
 ```
 
-`opencode.json`:
+安装时自动注册到 `~/.config/opencode/plugins/`。重启 OpenCode 即可使用。
 
-```json
-{
-  "plugin": ["opencode-q"]
-}
-```
+> **手动配置:** 在项目 `opencode.json` 中添加: `{ "plugin": ["opencode-q"] }`
 
 ## 使用方法
 
