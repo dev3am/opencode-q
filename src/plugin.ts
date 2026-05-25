@@ -70,6 +70,10 @@ export default (async ({ client, directory, options }: any) => {
     })
   }
 
+  function mapSession(ctx: any) {
+    if (ctx?.sessionID) setSessionIdMapping(baseDir, "default", ctx.sessionID)
+  }
+
   return {
     event: async ({ event }: any) => {
       if (event.properties?.sessionID) {
@@ -107,9 +111,7 @@ export default (async ({ client, directory, options }: any) => {
           text: tool.schema.string(),
         },
         async execute(args: { text: string }, ctx: any) {
-          if (ctx?.sessionID) {
-            setSessionIdMapping(baseDir, "default", ctx.sessionID)
-          }
+          mapSession(ctx)
           const item = QM.add(baseDir, "default", args.text)
           broadcast("queue-updated", { baseDir, sessionId: "default" })
           return `큐에 추가됨 (#${item.id})`
@@ -120,9 +122,7 @@ export default (async ({ client, directory, options }: any) => {
         description: "큐의 모든 프롬프트를 조회합니다",
         args: {},
         async execute(_args: any, ctx: any) {
-          if (ctx?.sessionID) {
-            setSessionIdMapping(baseDir, "default", ctx.sessionID)
-          }
+          mapSession(ctx)
           const items = QM.getAll(baseDir, "default")
           if (items.length === 0) return "큐가 비어있습니다"
           return items
@@ -143,9 +143,7 @@ export default (async ({ client, directory, options }: any) => {
           id: tool.schema.string(),
         },
         async execute(args: { id: string }, ctx: any) {
-          if (ctx?.sessionID) {
-            setSessionIdMapping(baseDir, "default", ctx.sessionID)
-          }
+          mapSession(ctx)
           const removed = QM.remove(baseDir, "default", args.id)
           broadcast("queue-updated", { baseDir, sessionId: "default" })
           return removed
@@ -158,9 +156,7 @@ export default (async ({ client, directory, options }: any) => {
         description: "큐를 초기화합니다",
         args: {},
         async execute(_args: any, ctx: any) {
-          if (ctx?.sessionID) {
-            setSessionIdMapping(baseDir, "default", ctx.sessionID)
-          }
+          mapSession(ctx)
           QM.clear(baseDir, "default")
           broadcast("queue-updated", { baseDir, sessionId: "default" })
           return "큐가 초기화되었습니다"
@@ -175,9 +171,7 @@ export default (async ({ client, directory, options }: any) => {
           to: tool.schema.number(),
         },
         async execute(args: { from: number; to: number }, ctx: any) {
-          if (ctx?.sessionID) {
-            setSessionIdMapping(baseDir, "default", ctx.sessionID)
-          }
+          mapSession(ctx)
           try {
             const items = QM.reorder(baseDir, "default", args.from - 1, args.to - 1)
             broadcast("queue-updated", { baseDir, sessionId: "default" })
@@ -192,9 +186,7 @@ export default (async ({ client, directory, options }: any) => {
         description: "큐의 다음 프롬프트를 TUI 프롬프트 입력란에 채웁니다",
         args: {},
         async execute(_args: any, ctx: any) {
-          if (ctx?.sessionID) {
-            setSessionIdMapping(baseDir, "default", ctx.sessionID)
-          }
+          mapSession(ctx)
           const item = QM.dequeue(baseDir, "default")
           if (!item) return "큐가 비어있습니다"
           await client.tui.appendPrompt({

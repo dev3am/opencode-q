@@ -54,20 +54,24 @@ export function createHandler(config: ServerConfig) {
   const sseClients: http.ServerResponse[] = []
   const projects = new Map<string, ProjectState>()
 
+  function ensureSession(project: ProjectState, sessionId: string, status: SessionStatus = "unknown") {
+    const s = project.sessions.get(sessionId)
+    if (s) s.status = status
+    else project.sessions.set(sessionId, { status })
+  }
+
   function registerProject(reg: ProjectRegistration): void {
     const existing = projects.get(reg.baseDir)
     if (existing) {
       existing.sdkClient = reg.sdkClient
-      const sessionState = existing.sessions.get(reg.sessionId)
-      if (sessionState) sessionState.status = "unknown"
-      else existing.sessions.set(reg.sessionId, { status: "unknown" })
+      ensureSession(existing, reg.sessionId)
       existing.aliasToReal.set("default", reg.sessionId)
       serverLog(`project updated: ${reg.baseDir}`)
     } else {
       const state: ProjectState = {
         baseDir: reg.baseDir,
         sdkClient: reg.sdkClient,
-        sessions: new Map([[reg.sessionId, { status: "unknown" }]]),
+        sessions: new Map([[reg.sessionId, { status: "unknown" as SessionStatus }]]),
         aliasToReal: new Map([["default", reg.sessionId]]),
       }
       projects.set(reg.baseDir, state)
@@ -118,9 +122,7 @@ export function createHandler(config: ServerConfig) {
   function setSessionStatus(baseDir: string, sessionId: string, status: SessionStatus, detail?: { prompt?: string; message?: string }) {
     const project = projects.get(baseDir)
     if (!project) return
-    const sessionState = project.sessions.get(sessionId)
-    if (sessionState) sessionState.status = status
-    else project.sessions.set(sessionId, { status })
+    ensureSession(project, sessionId, status)
     const realId = project.aliasToReal.get(sessionId)
     broadcast("session-status", { baseDir, status, sessionId, realSessionId: realId, prompt: detail?.prompt, message: detail?.message })
   }
