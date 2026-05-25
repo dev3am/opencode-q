@@ -23,19 +23,15 @@
 - [Bun](https://bun.sh) 1.x
 - OpenCode 1.x
 
-### npm (배포 후)
+### npm
 
 ```bash
 npm install opencode-q
 ```
 
-`opencode.json`:
+설치 시 자동으로 `~/.config/opencode/plugins/`에 등록됩니다. OpenCode를 재시작하면 바로 사용 가능합니다.
 
-```json
-{
-  "plugin": ["opencode-q"]
-}
-```
+> **수동 설정:** 프로젝트 `opencode.json`에 추가: `{ "plugin": ["opencode-q"] }`
 
 ## 사용법
 
