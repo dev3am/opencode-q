@@ -85,6 +85,13 @@ export function createHandler(config: ServerConfig) {
     return projects.get(baseDir)
   }
 
+  function requireProject(encodedBaseDir: string): { baseDir: string; project: ProjectState } | null {
+    const baseDir = decodeURIComponent(encodedBaseDir)
+    const project = getProjectState(baseDir)
+    if (!project) return null
+    return { baseDir, project }
+  }
+
   function resolveSessionId(project: ProjectState, sid: string): string {
     return project.aliasToReal.get(sid) || sid
   }
@@ -164,27 +171,36 @@ export function createHandler(config: ServerConfig) {
     }
 
     m = pathname.match(/^\/api\/projects\/([^/]+)$/)
-    if (m && req.method === "DELETE") {
+    if (m) {
       const [, encodedBaseDir] = m
       const baseDir = decodeURIComponent(encodedBaseDir)
-      const removed = unregisterProject(baseDir)
-      if (!removed) { jsonResponse(res, { error: "Project not found" }, 404); return }
-      broadcast("projects-updated", {})
-      if (projects.size === 0 && serverSingleton) {
-        serverLog("last project unregistered, shutting down server")
-        serverSingleton.server.close()
-        serverSingleton = null
+      if (req.method === "GET") {
+        const project = getProjectState(baseDir)
+        if (!project) { jsonResponse(res, { error: "Project not found" }, 404); return }
+        const sessions = Array.from(project.sessions.entries()).map(([sid, s]) => ({ sessionId: sid, status: s.status }))
+        jsonResponse(res, { baseDir: project.baseDir, sessions })
+        return
       }
-      jsonResponse(res, { unregistered: true })
-      return
+      if (req.method === "DELETE") {
+        const removed = unregisterProject(baseDir)
+        if (!removed) { jsonResponse(res, { error: "Project not found" }, 404); return }
+        broadcast("projects-updated", {})
+        if (projects.size === 0 && serverSingleton) {
+          serverLog("last project unregistered, shutting down server")
+          serverSingleton.server.close()
+          serverSingleton = null
+        }
+        jsonResponse(res, { unregistered: true })
+        return
+      }
     }
 
     m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/reorder$/)
     if (m && req.method === "PATCH") {
       const [, encodedBaseDir, sid] = m
-      const baseDir = decodeURIComponent(encodedBaseDir)
-      const project = getProjectState(baseDir)
-      if (!project) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { baseDir } = rp
       const body = JSON.parse(await parseBody(req))
       try {
         const items = QM.reorder(baseDir, sid, body.from - 1, body.to - 1)
@@ -197,9 +213,9 @@ export function createHandler(config: ServerConfig) {
     m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/execute\/([^/]+)$/)
     if (m && req.method === "POST") {
       const [, encodedBaseDir, sid, id] = m
-      const baseDir = decodeURIComponent(encodedBaseDir)
-      const project = getProjectState(baseDir)
-      if (!project) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { baseDir, project } = rp
       const data = Storage.load(baseDir, sid)
       const idx = data.items.findIndex((i) => i.id === id)
       if (idx === -1) { jsonResponse(res, { error: "Item not found" }, 404); return }
@@ -226,9 +242,9 @@ export function createHandler(config: ServerConfig) {
     m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/next$/)
     if (m && req.method === "POST") {
       const [, encodedBaseDir, sid] = m
-      const baseDir = decodeURIComponent(encodedBaseDir)
-      const project = getProjectState(baseDir)
-      if (!project) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { baseDir, project } = rp
       const item = QM.dequeue(baseDir, sid)
       if (!item) { jsonResponse(res, { executed: false }); return }
       if (!project.sdkClient) { QM.reinsertAtFront(baseDir, sid, item); jsonResponse(res, { error: "SDK not available" }, 503); return }
@@ -252,9 +268,9 @@ export function createHandler(config: ServerConfig) {
     m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/retry$/)
     if (m && req.method === "POST") {
       const [, encodedBaseDir, sid] = m
-      const baseDir = decodeURIComponent(encodedBaseDir)
-      const project = getProjectState(baseDir)
-      if (!project) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { baseDir, project } = rp
       const sessionState = project.sessions.get(sid)
       const failed = sessionState?.failedItem
       if (!failed) { jsonResponse(res, { error: "No failed item" }, 404); return }
@@ -276,9 +292,9 @@ export function createHandler(config: ServerConfig) {
     m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/skip$/)
     if (m && req.method === "POST") {
       const [, encodedBaseDir, sid] = m
-      const baseDir = decodeURIComponent(encodedBaseDir)
-      const project = getProjectState(baseDir)
-      if (!project) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { baseDir, project } = rp
       const sessionState = project.sessions.get(sid)
       const failed = sessionState?.failedItem
       if (!failed) { jsonResponse(res, { error: "No failed item" }, 404); return }
@@ -291,9 +307,9 @@ export function createHandler(config: ServerConfig) {
     m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/([^/]+)$/)
     if (m && req.method === "DELETE") {
       const [, encodedBaseDir, sid, id] = m
-      const baseDir = decodeURIComponent(encodedBaseDir)
-      const project = getProjectState(baseDir)
-      if (!project) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { baseDir } = rp
       const removed = QM.remove(baseDir, sid, id)
       if (!removed) { jsonResponse(res, { error: "Item not found" }, 404); return }
       broadcast("queue-updated", { baseDir, sessionId: sid })
@@ -304,9 +320,9 @@ export function createHandler(config: ServerConfig) {
     m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)$/)
     if (m) {
       const [, encodedBaseDir, sid] = m
-      const baseDir = decodeURIComponent(encodedBaseDir)
-      const project = getProjectState(baseDir)
-      if (!project) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { baseDir } = rp
       if (req.method === "GET") {
         const items = QM.getAll(baseDir, sid)
         const data = Storage.load(baseDir, sid)
@@ -333,9 +349,9 @@ export function createHandler(config: ServerConfig) {
     m = pathname.match(/^\/api\/projects\/([^/]+)\/session\/([^/]+)$/)
     if (m && req.method === "GET") {
       const [, encodedBaseDir, sid] = m
-      const baseDir = decodeURIComponent(encodedBaseDir)
-      const project = getProjectState(baseDir)
-      if (!project) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { project } = rp
       const sessionState = project.sessions.get(sid)
       const failed = sessionState?.failedItem
       jsonResponse(res, { status: sessionState?.status || "unknown", failedItem: failed?.item ?? null, retryCount: failed?.retryCount ?? 0 })
