@@ -22,3 +22,19 @@ export interface QueueData {
   items: QueueItem[]
   updatedAt: string
 }
+
+export interface ProjectState {
+  baseDir: string
+  sdkClient: any
+  sessions: Map<string, {
+    status: SessionStatus
+    failedItem?: FailedItem
+  }>
+  aliasToReal: Map<string, string>
+}
+
+export interface ProjectRegistration {
+  baseDir: string
+  sdkClient: any
+  sessionId: string
+}
