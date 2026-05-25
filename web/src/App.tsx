@@ -1,26 +1,60 @@
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useQueue } from "./hooks/useQueue"
+import { fetchProjects, createSSE, type ProjectInfo } from "./api/client"
 import Header from "./components/Header"
 import QueueList from "./components/QueueList"
 import AddPrompt from "./components/AddPrompt"
 import EmptyState from "./components/EmptyState"
+import ProjectSidebar from "./components/ProjectSidebar"
 
 export default function App() {
-  const [sessionId] = useState(() => {
+  const [projects, setProjects] = useState<ProjectInfo[]>([])
+  const [selectedBaseDir, setSelectedBaseDir] = useState<string>(() => {
     const params = new URLSearchParams(window.location.search)
-    return params.get("session") || "default"
+    return params.get("project") || ""
   })
-  const { items, add, remove, clear, reorder, executeById, retry, skip, sessionStatus, realSessionId, statusDetail } = useQueue(sessionId)
+  const sessionId = "default"
+
+  const refreshProjects = useCallback(() => {
+    fetchProjects().then((data) => {
+      setProjects((prev) => {
+        const next = data.projects
+        setSelectedBaseDir((cur) => {
+          if (!cur && next.length > 0) return next[0].baseDir
+          if (cur && !next.some((p) => p.baseDir === cur)) {
+            return next.length > 0 ? next[0].baseDir : ""
+          }
+          return cur
+        })
+        return next
+      })
+    })
+  }, [])
+
+  useEffect(() => { refreshProjects() }, [refreshProjects])
+
+  useEffect(() => {
+    const es = createSSE()
+    es.addEventListener("projects-updated", () => { refreshProjects() })
+    return () => es.close()
+  }, [refreshProjects])
+
+  const { items, add, remove, clear, reorder, executeById, retry, skip, sessionStatus, realSessionId, statusDetail } = useQueue(selectedBaseDir, sessionId)
 
   return (
-    <div style={{ maxWidth: 600, margin: "0 auto", padding: 16 }}>
-      <Header sessionId={sessionId} realSessionId={realSessionId} sessionStatus={sessionStatus} statusDetail={statusDetail} onRetry={retry} onSkip={skip} />
-      {items.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <QueueList items={items} onRemove={remove} onReorder={reorder} onClear={clear} onExecute={executeById} />
+    <div style={{ display: "flex", minHeight: "100vh" }}>
+      {projects.length > 1 && (
+        <ProjectSidebar projects={projects} selectedBaseDir={selectedBaseDir} onSelect={setSelectedBaseDir} />
       )}
-      <AddPrompt onAdd={add} />
+      <div style={{ flex: 1, maxWidth: 600, margin: "0 auto", padding: 16 }}>
+        <Header sessionId={sessionId} realSessionId={realSessionId} sessionStatus={sessionStatus} statusDetail={statusDetail} onRetry={retry} onSkip={skip} />
+        {items.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <QueueList items={items} onRemove={remove} onReorder={reorder} onClear={clear} onExecute={executeById} />
+        )}
+        <AddPrompt onAdd={add} />
+      </div>
     </div>
   )
 }

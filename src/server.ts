@@ -1,11 +1,11 @@
 import * as http from "node:http"
 import * as QM from "./queue-manager"
 import * as Storage from "./storage"
-import { PREVIEW_LENGTH, SSE_HEARTBEAT_MS } from "./constants"
+import { SSE_HEARTBEAT_MS } from "./constants"
 import { existsSync, readFileSync, appendFileSync } from "node:fs"
 import { join, extname, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
-import type { SessionStatus, FailedItem } from "./types"
+import type { SessionStatus, FailedItem, ProjectState, ProjectRegistration } from "./types"
 
 const DEBUG_ENABLED = !!process.env.OPENCODE_Q_DEBUG
 const DEBUG_LOG = DEBUG_ENABLED
@@ -21,8 +21,6 @@ function serverLog(msg: string) {
 }
 
 interface ServerConfig {
-  baseDir: string
-  sdkClient: any
   webDir?: string
 }
 
@@ -52,19 +50,61 @@ function jsonResponse(res: http.ServerResponse, body: any, status = 200) {
 }
 
 export function createHandler(config: ServerConfig) {
-  const { baseDir, sdkClient, webDir } = config
+  const { webDir } = config
   const sseClients: http.ServerResponse[] = []
-  const lastFailedItem = new Map<string, FailedItem>()
-  const lastSessionStatus = new Map<string, SessionStatus>()
-  const aliasToReal = new Map<string, string>()
+  const projects = new Map<string, ProjectState>()
 
-  function resolveSessionId(sid: string): string {
-    return aliasToReal.get(sid) || sid
+  function ensureSession(project: ProjectState, sessionId: string, status: SessionStatus = "unknown") {
+    const s = project.sessions.get(sessionId)
+    if (s) s.status = status
+    else project.sessions.set(sessionId, { status })
   }
 
-  function setSessionIdMapping(alias: string, realId: string) {
-    aliasToReal.set(alias, realId)
-    serverLog(`sessionId mapping: "${alias}" -> "${realId}"`)
+  function registerProject(reg: ProjectRegistration): void {
+    const existing = projects.get(reg.baseDir)
+    if (existing) {
+      existing.sdkClient = reg.sdkClient
+      ensureSession(existing, reg.sessionId)
+      existing.aliasToReal.set("default", reg.sessionId)
+      serverLog(`project updated: ${reg.baseDir}`)
+    } else {
+      const state: ProjectState = {
+        baseDir: reg.baseDir,
+        sdkClient: reg.sdkClient,
+        sessions: new Map([[reg.sessionId, { status: "unknown" as SessionStatus }]]),
+        aliasToReal: new Map([["default", reg.sessionId]]),
+      }
+      projects.set(reg.baseDir, state)
+      serverLog(`project registered: ${reg.baseDir}`)
+    }
+  }
+
+  function unregisterProject(baseDir: string): boolean {
+    const removed = projects.delete(baseDir)
+    if (removed) serverLog(`project unregistered: ${baseDir}`)
+    return removed
+  }
+
+  function getProjectState(baseDir: string): ProjectState | undefined {
+    return projects.get(baseDir)
+  }
+
+  function requireProject(encodedBaseDir: string): { baseDir: string; project: ProjectState } | null {
+    const baseDir = decodeURIComponent(encodedBaseDir)
+    const project = getProjectState(baseDir)
+    if (!project) return null
+    return { baseDir, project }
+  }
+
+  function resolveSessionId(project: ProjectState, sid: string): string {
+    return project.aliasToReal.get(sid) || sid
+  }
+
+  function setSessionIdMapping(baseDir: string, alias: string, realId: string) {
+    const project = projects.get(baseDir)
+    if (!project) return
+    project.aliasToReal.set(alias, realId)
+    serverLog(`sessionId mapping: "${alias}" -> "${realId}" [${baseDir}]`)
   }
 
   function broadcast(event: string, data: any) {
@@ -79,10 +119,12 @@ export function createHandler(config: ServerConfig) {
     }
   }
 
-  function setSessionStatus(sessionId: string, status: SessionStatus, detail?: { prompt?: string; message?: string }) {
-    lastSessionStatus.set(sessionId, status)
-    const realId = aliasToReal.get(sessionId)
-    broadcast("session-status", { status, sessionId, realSessionId: realId, prompt: detail?.prompt, message: detail?.message })
+  function setSessionStatus(baseDir: string, sessionId: string, status: SessionStatus, detail?: { prompt?: string; message?: string }) {
+    const project = projects.get(baseDir)
+    if (!project) return
+    ensureSession(project, sessionId, status)
+    const realId = project.aliasToReal.get(sessionId)
+    broadcast("session-status", { baseDir, status, sessionId, realSessionId: realId, prompt: detail?.prompt, message: detail?.message })
   }
 
   function serveStaticRes(webDir: string, urlPath: string, res: http.ServerResponse): boolean {
@@ -112,80 +154,135 @@ export function createHandler(config: ServerConfig) {
 
     let m: RegExpMatchArray | null
 
-    m = pathname.match(/^\/api\/queue\/([^/]+)\/reorder$/)
+    if (pathname === "/api/projects" && req.method === "GET") {
+      const list = Array.from(projects.values()).map((p) => {
+        const sessions = Array.from(p.sessions.entries()).map(([sid, s]) => ({ sessionId: sid, status: s.status }))
+        return { baseDir: p.baseDir, sessions }
+      })
+      jsonResponse(res, { projects: list })
+      return
+    }
+
+    if (pathname === "/api/projects/register" && req.method === "POST") {
+      const body = JSON.parse(await parseBody(req))
+      if (!body.baseDir) { jsonResponse(res, { error: "baseDir is required" }, 400); return }
+      registerProject({ baseDir: body.baseDir, sdkClient: null, sessionId: body.sessionId || "default" })
+      broadcast("projects-updated", {})
+      jsonResponse(res, { registered: true, baseDir: body.baseDir })
+      return
+    }
+
+    m = pathname.match(/^\/api\/projects\/([^/]+)$/)
+    if (m) {
+      const [, encodedBaseDir] = m
+      const baseDir = decodeURIComponent(encodedBaseDir)
+      if (req.method === "GET") {
+        const project = getProjectState(baseDir)
+        if (!project) { jsonResponse(res, { error: "Project not found" }, 404); return }
+        const sessions = Array.from(project.sessions.entries()).map(([sid, s]) => ({ sessionId: sid, status: s.status }))
+        jsonResponse(res, { baseDir: project.baseDir, sessions })
+        return
+      }
+      if (req.method === "DELETE") {
+        const removed = unregisterProject(baseDir)
+        if (!removed) { jsonResponse(res, { error: "Project not found" }, 404); return }
+        broadcast("projects-updated", {})
+        if (projects.size === 0 && serverSingleton) {
+          serverLog("last project unregistered, shutting down server")
+          serverSingleton.server.close()
+          serverSingleton = null
+        }
+        jsonResponse(res, { unregistered: true })
+        return
+      }
+    }
+
+    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/reorder$/)
     if (m && req.method === "PATCH") {
-      const [, sid] = m
+      const [, encodedBaseDir, sid] = m
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { baseDir } = rp
       const body = JSON.parse(await parseBody(req))
       try {
         const items = QM.reorder(baseDir, sid, body.from - 1, body.to - 1)
-        broadcast("queue-updated", { sessionId: sid })
+        broadcast("queue-updated", { baseDir, sessionId: sid })
         jsonResponse(res, { items })
       } catch (e: any) { jsonResponse(res, { error: e.message }, 400) }
       return
     }
 
-    m = pathname.match(/^\/api\/queue\/([^/]+)\/execute\/([^/]+)$/)
+    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/execute\/([^/]+)$/)
     if (m && req.method === "POST") {
-      const [, sid, id] = m
+      const [, encodedBaseDir, sid, id] = m
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { baseDir, project } = rp
       const data = Storage.load(baseDir, sid)
       const idx = data.items.findIndex((i) => i.id === id)
       if (idx === -1) { jsonResponse(res, { error: "Item not found" }, 404); return }
       const [item] = data.items.splice(idx, 1)
       Storage.save(baseDir, sid, data)
-      if (!sdkClient) { data.items.unshift(item); Storage.save(baseDir, sid, data); jsonResponse(res, { error: "SDK not available" }, 503); return }
+      if (!project.sdkClient) { data.items.unshift(item); Storage.save(baseDir, sid, data); jsonResponse(res, { error: "SDK not available" }, 503); return }
       try {
-        const rid = resolveSessionId(sid)
+        const rid = resolveSessionId(project, sid)
         serverLog(`execute: alias=${sid}, real=${rid}, text="${item.text.slice(0, 50)}"`)
-        const result = await sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: item.text }] } })
-        serverLog(`execute: returned — ${JSON.stringify(result)?.slice(0, 200)}`)
-        broadcast("queue-updated", { sessionId: sid })
+        await project.sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: item.text }] } })
+        broadcast("queue-updated", { baseDir, sessionId: sid })
         jsonResponse(res, { executed: true, item })
       } catch (err) {
         data.items.unshift(item); Storage.save(baseDir, sid, data)
-        lastFailedItem.set(sid, { item, retryCount: 0 })
-        lastSessionStatus.set(sid, "error")
-        broadcast("queue-updated", { sessionId: sid })
-        broadcast("session-status", { status: "error", sessionId: sid, message: String(err) })
+        const sessionState = project.sessions.get(sid)
+        if (sessionState) { sessionState.failedItem = { item, retryCount: 0 }; sessionState.status = "error" }
+        broadcast("queue-updated", { baseDir, sessionId: sid })
+        broadcast("session-status", { baseDir, status: "error", sessionId: sid, message: String(err) })
         jsonResponse(res, { error: String(err), item, canRetry: true }, 500)
       }
       return
     }
 
-    m = pathname.match(/^\/api\/queue\/([^/]+)\/next$/)
+    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/next$/)
     if (m && req.method === "POST") {
-      const [, sid] = m
+      const [, encodedBaseDir, sid] = m
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { baseDir, project } = rp
       const item = QM.dequeue(baseDir, sid)
       if (!item) { jsonResponse(res, { executed: false }); return }
-      if (!sdkClient) { QM.reinsertAtFront(baseDir, sid, item); jsonResponse(res, { error: "SDK not available" }, 503); return }
+      if (!project.sdkClient) { QM.reinsertAtFront(baseDir, sid, item); jsonResponse(res, { error: "SDK not available" }, 503); return }
       try {
-        const rid = resolveSessionId(sid)
+        const rid = resolveSessionId(project, sid)
         serverLog(`next: alias=${sid}, real=${rid}`)
-        await sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: item.text }] } })
-        broadcast("queue-updated", { sessionId: sid })
+        await project.sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: item.text }] } })
+        broadcast("queue-updated", { baseDir, sessionId: sid })
         jsonResponse(res, { executed: true, item })
       } catch (err) {
         QM.reinsertAtFront(baseDir, sid, item)
-        lastFailedItem.set(sid, { item, retryCount: 0 })
-        lastSessionStatus.set(sid, "error")
-        broadcast("queue-updated", { sessionId: sid })
-        broadcast("session-status", { status: "error", sessionId: sid, message: String(err) })
+        const sessionState = project.sessions.get(sid)
+        if (sessionState) { sessionState.failedItem = { item, retryCount: 0 }; sessionState.status = "error" }
+        broadcast("queue-updated", { baseDir, sessionId: sid })
+        broadcast("session-status", { baseDir, status: "error", sessionId: sid, message: String(err) })
         jsonResponse(res, { error: String(err), item, canRetry: true }, 500)
       }
       return
     }
 
-    m = pathname.match(/^\/api\/queue\/([^/]+)\/retry$/)
+    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/retry$/)
     if (m && req.method === "POST") {
-      const [, sid] = m
-      const failed = lastFailedItem.get(sid)
+      const [, encodedBaseDir, sid] = m
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { baseDir, project } = rp
+      const sessionState = project.sessions.get(sid)
+      const failed = sessionState?.failedItem
       if (!failed) { jsonResponse(res, { error: "No failed item" }, 404); return }
       if (failed.retryCount >= 3) { jsonResponse(res, { error: "Max retries exceeded", item: failed.item }, 429); return }
-      if (!sdkClient) { jsonResponse(res, { error: "SDK not available" }, 503); return }
+      if (!project.sdkClient) { jsonResponse(res, { error: "SDK not available" }, 503); return }
       try {
-        const rid = resolveSessionId(sid)
-        await sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: failed.item.text }] } })
-        lastFailedItem.delete(sid)
-        broadcast("queue-updated", { sessionId: sid })
+        const rid = resolveSessionId(project, sid)
+        await project.sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: failed.item.text }] } })
+        if (sessionState) { sessionState.failedItem = undefined; sessionState.status = "idle" }
+        broadcast("queue-updated", { baseDir, sessionId: sid })
         jsonResponse(res, { executed: true, item: failed.item })
       } catch (err) {
         failed.retryCount++
@@ -194,30 +291,40 @@ export function createHandler(config: ServerConfig) {
       return
     }
 
-    m = pathname.match(/^\/api\/queue\/([^/]+)\/skip$/)
+    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/skip$/)
     if (m && req.method === "POST") {
-      const [, sid] = m
-      const failed = lastFailedItem.get(sid)
+      const [, encodedBaseDir, sid] = m
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { baseDir, project } = rp
+      const sessionState = project.sessions.get(sid)
+      const failed = sessionState?.failedItem
       if (!failed) { jsonResponse(res, { error: "No failed item" }, 404); return }
-      lastFailedItem.delete(sid)
-      broadcast("queue-updated", { sessionId: sid })
+      if (sessionState) { sessionState.failedItem = undefined }
+      broadcast("queue-updated", { baseDir, sessionId: sid })
       jsonResponse(res, { skipped: true, item: failed.item })
       return
     }
 
-    m = pathname.match(/^\/api\/queue\/([^/]+)\/([^/]+)$/)
+    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/([^/]+)$/)
     if (m && req.method === "DELETE") {
-      const [, sid, id] = m
+      const [, encodedBaseDir, sid, id] = m
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { baseDir } = rp
       const removed = QM.remove(baseDir, sid, id)
       if (!removed) { jsonResponse(res, { error: "Item not found" }, 404); return }
-      broadcast("queue-updated", { sessionId: sid })
+      broadcast("queue-updated", { baseDir, sessionId: sid })
       jsonResponse(res, { removed: true })
       return
     }
 
-    m = pathname.match(/^\/api\/queue\/([^/]+)$/)
+    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)$/)
     if (m) {
-      const [, sid] = m
+      const [, encodedBaseDir, sid] = m
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { baseDir } = rp
       if (req.method === "GET") {
         const items = QM.getAll(baseDir, sid)
         const data = Storage.load(baseDir, sid)
@@ -228,24 +335,28 @@ export function createHandler(config: ServerConfig) {
         const body = JSON.parse(await parseBody(req))
         try {
           const item = QM.add(baseDir, sid, body.text)
-          broadcast("queue-updated", { sessionId: sid })
+          broadcast("queue-updated", { baseDir, sessionId: sid })
           jsonResponse(res, { item }, 201)
         } catch (e: any) { jsonResponse(res, { error: e.message }, 400) }
         return
       }
       if (req.method === "DELETE") {
         QM.clear(baseDir, sid)
-        broadcast("queue-updated", { sessionId: sid })
+        broadcast("queue-updated", { baseDir, sessionId: sid })
         jsonResponse(res, { cleared: true })
         return
       }
     }
 
-    m = pathname.match(/^\/api\/session\/([^/]+)$/)
+    m = pathname.match(/^\/api\/projects\/([^/]+)\/session\/([^/]+)$/)
     if (m && req.method === "GET") {
-      const [, sid] = m
-      const failed = lastFailedItem.get(sid)
-      jsonResponse(res, { status: lastSessionStatus.get(sid) || "unknown", failedItem: failed?.item ?? null, retryCount: failed?.retryCount ?? 0 })
+      const [, encodedBaseDir, sid] = m
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { project } = rp
+      const sessionState = project.sessions.get(sid)
+      const failed = sessionState?.failedItem
+      jsonResponse(res, { status: sessionState?.status || "unknown", failedItem: failed?.item ?? null, retryCount: failed?.retryCount ?? 0 })
       return
     }
 
@@ -254,13 +365,24 @@ export function createHandler(config: ServerConfig) {
     jsonResponse(res, { error: "Not found" }, 404)
   }
 
-  return { handler: handleRequest, broadcast, setSessionStatus, setSessionIdMapping }
+  return {
+    handler: handleRequest,
+    broadcast,
+    registerProject,
+    unregisterProject,
+    getProjectState,
+    setSessionStatus,
+    setSessionIdMapping,
+  }
 }
 
 let serverSingleton: {
   broadcast: (event: string, data: any) => void
-  setSessionStatus: (sid: string, status: any, detail?: any) => void
-  setSessionIdMapping: (alias: string, realId: string) => void
+  registerProject: (reg: ProjectRegistration) => void
+  unregisterProject: (baseDir: string) => boolean
+  getProjectState: (baseDir: string) => ProjectState | undefined
+  setSessionStatus: (baseDir: string, sid: string, status: any, detail?: any) => void
+  setSessionIdMapping: (baseDir: string, alias: string, realId: string) => void
   server: http.Server
 } | null = null
 
@@ -271,7 +393,6 @@ export function resetServerSingleton() {
 function listenWithFallback(server: http.Server, port: number): Promise<number> {
   return new Promise((resolve) => {
     let retried = false
-
     server.on("error", (err: any) => {
       if (err.code === "EADDRINUSE" && !retried) {
         retried = true
@@ -281,23 +402,21 @@ function listenWithFallback(server: http.Server, port: number): Promise<number> 
         serverLog(`Server error: ${err}`)
       }
     })
-
     server.on("listening", () => {
       const addr = server.address()
       resolve(typeof addr === "object" && addr ? addr.port : port)
     })
-
     server.listen(port)
   })
 }
 
 export async function startServer(config: ServerConfig & { port: number }) {
   const { port, ...handlerConfig } = config
-  const { handler, broadcast, setSessionStatus, setSessionIdMapping } = createHandler(handlerConfig)
+  const { handler, broadcast, registerProject, unregisterProject, getProjectState, setSessionStatus, setSessionIdMapping } = createHandler(handlerConfig)
 
   if (serverSingleton) {
     serverLog(`Server already running, reusing`)
-    return { ...serverSingleton, port: (serverSingleton.server.address() as any)?.port ?? port }
+    return { ...serverSingleton, broadcast, registerProject, unregisterProject, getProjectState, setSessionStatus, setSessionIdMapping, port: (serverSingleton.server.address() as any)?.port ?? port }
   }
 
   const server = http.createServer((req, res) => {
@@ -310,6 +429,6 @@ export async function startServer(config: ServerConfig & { port: number }) {
   const actualPort = await listenWithFallback(server, port)
   serverLog(`server started at http://localhost:${actualPort}`)
 
-  serverSingleton = { broadcast, setSessionStatus, setSessionIdMapping, server }
-  return { broadcast, setSessionStatus, setSessionIdMapping, server, port: actualPort }
+  serverSingleton = { broadcast, registerProject, unregisterProject, getProjectState, setSessionStatus, setSessionIdMapping, server }
+  return { broadcast, registerProject, unregisterProject, getProjectState, setSessionStatus, setSessionIdMapping, server, port: actualPort }
 }
