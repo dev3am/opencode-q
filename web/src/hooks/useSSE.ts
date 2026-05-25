@@ -6,23 +6,24 @@ export interface StatusDetail {
   message?: string
 }
 
-export function useSSE(sessionId: string, onUpdate: () => void) {
+export function useSSE(baseDir: string, sessionId: string, onUpdate: () => void) {
   const [sessionStatus, setSessionStatus] = useState<string>("unknown")
   const [realSessionId, setRealSessionId] = useState<string | null>(null)
   const [statusDetail, setStatusDetail] = useState<StatusDetail>({})
 
   useEffect(() => {
+    if (!baseDir) return
     const es = createSSE()
     es.addEventListener("queue-updated", (e) => {
       try {
         const data = JSON.parse((e as MessageEvent).data)
-        if (!data.sessionId || data.sessionId === sessionId) onUpdate()
+        if (data.baseDir === baseDir && (!data.sessionId || data.sessionId === sessionId)) onUpdate()
       } catch {}
     })
     es.addEventListener("session-status", (e) => {
       try {
         const data = JSON.parse((e as MessageEvent).data)
-        if (data.sessionId === sessionId) {
+        if (data.baseDir === baseDir && data.sessionId === sessionId) {
           setSessionStatus(data.status)
           setStatusDetail({ prompt: data.prompt, message: data.message })
           if (data.realSessionId) setRealSessionId(data.realSessionId)
@@ -30,7 +31,7 @@ export function useSSE(sessionId: string, onUpdate: () => void) {
       } catch {}
     })
     return () => es.close()
-  }, [sessionId, onUpdate])
+  }, [baseDir, sessionId, onUpdate])
 
   return { sessionStatus, realSessionId, statusDetail }
 }
