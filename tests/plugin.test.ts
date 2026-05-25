@@ -20,8 +20,9 @@ beforeEach(async () => {
     },
   }
 
-  const { broadcast, setSessionIdMapping, setSessionStatus } = createHandler({ baseDir: testDir, sdkClient: null, webDir: undefined })
-  setSessionIdMapping("default", "test-session")
+  const { broadcast, setSessionIdMapping, setSessionStatus, registerProject } = createHandler({ webDir: undefined })
+  registerProject({ baseDir: testDir, sdkClient: null, sessionId: "default" })
+  setSessionIdMapping(testDir, "default", "test-session")
   const _ref = { broadcast, setSessionStatus }
 
   plugin = {
@@ -37,9 +38,9 @@ beforeEach(async () => {
         if (sseStatus) {
           capturedBroadcasts.push({
             event: "session-status",
-            data: { status: sseStatus, sessionId: "default" },
+            data: { status: sseStatus, sessionId: "default", baseDir: testDir },
           })
-          _ref.setSessionStatus("default", sseStatus)
+          _ref.setSessionStatus(testDir, "default", sseStatus)
         }
         return
       }
@@ -48,7 +49,7 @@ beforeEach(async () => {
         const sid = event.properties?.sessionID || "test-session"
         const items = QM.getAll(testDir, sid)
         if (items.length > 0) {
-          capturedBroadcasts.push({ event: "queue-updated", data: { sessionId: sid, count: items.length } })
+          capturedBroadcasts.push({ event: "queue-updated", data: { baseDir: testDir, sessionId: sid, count: items.length } })
         }
       }
     },

@@ -1,7 +1,6 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import { tool } from "@opencode-ai/plugin"
 import * as QM from "./queue-manager"
-import * as Storage from "./storage"
 import { startServer } from "./server"
 import { PREVIEW_LENGTH, DEFAULT_PORT, STORAGE_DIR } from "./constants"
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
@@ -61,7 +60,9 @@ export default (async ({ client, directory, options }: any) => {
 
   const webDir = resolveWebDir()
   const desiredPort = options?.port ?? DEFAULT_PORT
-  const { broadcast, setSessionIdMapping, setSessionStatus, port: actualPort } = await startServer({ baseDir, sdkClient: client.session, webDir, port: desiredPort })
+  const { broadcast, setSessionIdMapping, setSessionStatus, registerProject, port: actualPort } = await startServer({ webDir, port: desiredPort })
+
+  registerProject({ baseDir, sdkClient: client.session, sessionId: "default" })
 
   if (actualPort !== desiredPort) {
     client.tui.showToast({
@@ -72,14 +73,14 @@ export default (async ({ client, directory, options }: any) => {
   return {
     event: async ({ event }: any) => {
       if (event.properties?.sessionID) {
-        setSessionIdMapping("default", event.properties.sessionID)
+        setSessionIdMapping(baseDir, "default", event.properties.sessionID)
       }
 
       if (event.type === "session.status") {
         const statusType = event.properties?.status?.type
         const sseStatus = STATUS_MAP[statusType]
         if (sseStatus) {
-          setSessionStatus("default", sseStatus)
+          setSessionStatus(baseDir, "default", sseStatus)
         }
         return
       }
@@ -94,7 +95,7 @@ export default (async ({ client, directory, options }: any) => {
               variant: "info",
             },
           })
-          broadcast("queue-updated", { sessionId: sid, count: items.length })
+          broadcast("queue-updated", { baseDir, sessionId: sid, count: items.length })
         }
       }
     },
@@ -107,10 +108,10 @@ export default (async ({ client, directory, options }: any) => {
         },
         async execute(args: { text: string }, ctx: any) {
           if (ctx?.sessionID) {
-            setSessionIdMapping("default", ctx.sessionID)
+            setSessionIdMapping(baseDir, "default", ctx.sessionID)
           }
           const item = QM.add(baseDir, "default", args.text)
-          broadcast("queue-updated", { sessionId: "default" })
+          broadcast("queue-updated", { baseDir, sessionId: "default" })
           return `큐에 추가됨 (#${item.id})`
         },
       }),
@@ -120,7 +121,7 @@ export default (async ({ client, directory, options }: any) => {
         args: {},
         async execute(_args: any, ctx: any) {
           if (ctx?.sessionID) {
-            setSessionIdMapping("default", ctx.sessionID)
+            setSessionIdMapping(baseDir, "default", ctx.sessionID)
           }
           const items = QM.getAll(baseDir, "default")
           if (items.length === 0) return "큐가 비어있습니다"
@@ -143,10 +144,10 @@ export default (async ({ client, directory, options }: any) => {
         },
         async execute(args: { id: string }, ctx: any) {
           if (ctx?.sessionID) {
-            setSessionIdMapping("default", ctx.sessionID)
+            setSessionIdMapping(baseDir, "default", ctx.sessionID)
           }
           const removed = QM.remove(baseDir, "default", args.id)
-          broadcast("queue-updated", { sessionId: "default" })
+          broadcast("queue-updated", { baseDir, sessionId: "default" })
           return removed
             ? `삭제됨 (${args.id})`
             : `항목을 찾을 수 없습니다 (${args.id})`
@@ -158,10 +159,10 @@ export default (async ({ client, directory, options }: any) => {
         args: {},
         async execute(_args: any, ctx: any) {
           if (ctx?.sessionID) {
-            setSessionIdMapping("default", ctx.sessionID)
+            setSessionIdMapping(baseDir, "default", ctx.sessionID)
           }
           QM.clear(baseDir, "default")
-          broadcast("queue-updated", { sessionId: "default" })
+          broadcast("queue-updated", { baseDir, sessionId: "default" })
           return "큐가 초기화되었습니다"
         },
       }),
@@ -175,11 +176,11 @@ export default (async ({ client, directory, options }: any) => {
         },
         async execute(args: { from: number; to: number }, ctx: any) {
           if (ctx?.sessionID) {
-            setSessionIdMapping("default", ctx.sessionID)
+            setSessionIdMapping(baseDir, "default", ctx.sessionID)
           }
           try {
             const items = QM.reorder(baseDir, "default", args.from - 1, args.to - 1)
-            broadcast("queue-updated", { sessionId: "default" })
+            broadcast("queue-updated", { baseDir, sessionId: "default" })
             return `이동됨. 현재 순서:\n${items.map((item, i) => `${i + 1}. [${item.id}]`).join("\n")}`
           } catch (e) {
             return (e as Error).message
@@ -192,14 +193,14 @@ export default (async ({ client, directory, options }: any) => {
         args: {},
         async execute(_args: any, ctx: any) {
           if (ctx?.sessionID) {
-            setSessionIdMapping("default", ctx.sessionID)
+            setSessionIdMapping(baseDir, "default", ctx.sessionID)
           }
           const item = QM.dequeue(baseDir, "default")
           if (!item) return "큐가 비어있습니다"
           await client.tui.appendPrompt({
             body: { text: item.text },
           })
-          broadcast("queue-updated", { sessionId: "default" })
+          broadcast("queue-updated", { baseDir, sessionId: "default" })
           const preview =
             item.text.length > PREVIEW_LENGTH
               ? item.text.slice(0, PREVIEW_LENGTH) + "..."
