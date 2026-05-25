@@ -1,7 +1,7 @@
 import * as http from "node:http"
 import * as QM from "./queue-manager"
 import * as Storage from "./storage"
-import { PREVIEW_LENGTH, SSE_HEARTBEAT_MS } from "./constants"
+import { SSE_HEARTBEAT_MS } from "./constants"
 import { existsSync, readFileSync, appendFileSync } from "node:fs"
 import { join, extname, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
