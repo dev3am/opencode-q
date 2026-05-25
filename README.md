@@ -1,8 +1,12 @@
 # opencode-q
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/dev3am/opencode-q/main/assets/readme_hero_pixel.png" alt="opencode-q" width="600" />
+</p>
+
 **Prompt queue plugin for OpenCode** — Queue up prompts while AI is working and execute them sequentially with manual approval.
 
-[한국어](README.ko.md) | [日本語](README.ja.md) | [中文](README.zh.md)
+[한국어](https://github.com/dev3am/opencode-q/blob/main/README.ko.md) | [日本語](https://github.com/dev3am/opencode-q/blob/main/README.ja.md) | [中文](https://github.com/dev3am/opencode-q/blob/main/README.zh.md)
 
 ---
 
@@ -105,7 +109,7 @@ The Web UI starts automatically when the plugin loads.
 
 ## Architecture
 
-For development setup and detailed architecture, see [CONTRIBUTING.md](CONTRIBUTING.md).
+For development setup and detailed architecture, see [CONTRIBUTING.md](https://github.com/dev3am/opencode-q/blob/main/CONTRIBUTING.md).
 
 ## License
 

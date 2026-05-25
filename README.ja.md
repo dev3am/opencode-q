@@ -2,7 +2,7 @@
 
 **OpenCode用プロンプトキュープラグイン** — AIが作業中のプロンプトをキューに登録し、完了後に手動承認で順次実行します。
 
-[English](README.md) | [한국어](README.ko.md) | [中文](README.zh.md)
+[English](https://github.com/dev3am/opencode-q/blob/main/README.md) | [한국어](https://github.com/dev3am/opencode-q/blob/main/README.ko.md) | [中文](https://github.com/dev3am/opencode-q/blob/main/README.zh.md)
 
 ---
 
@@ -105,7 +105,7 @@ Web UIはプラグインロード時に自動起動します。
 
 ## アーキテクチャ
 
-開発セットアップと詳細なアーキテクチャについては [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+開発セットアップと詳細なアーキテクチャについては [CONTRIBUTING.md](https://github.com/dev3am/opencode-q/blob/main/CONTRIBUTING.md) を参照してください。
 
 ## ライセンス
 

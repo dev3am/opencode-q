@@ -2,7 +2,7 @@
 
 **OpenCode용 프롬프트 큐 플러그인** — AI가 작업 중인 동안 프롬프트를 큐에 미리 등록하고, 완료 후 수동 승인으로 순차 실행합니다.
 
-[English](README.md) | [日本語](README.ja.md) | [中文](README.zh.md)
+[English](https://github.com/dev3am/opencode-q/blob/main/README.md) | [日本語](https://github.com/dev3am/opencode-q/blob/main/README.ja.md) | [中文](https://github.com/dev3am/opencode-q/blob/main/README.zh.md)
 
 ---
 
@@ -105,7 +105,7 @@ Web UI는 플러그인이 로드될 때 자동으로 시작됩니다.
 
 ## 아키텍처
 
-개발 설정 및 상세 아키텍처는 [CONTRIBUTING.md](CONTRIBUTING.md)를 참조하세요.
+개발 설정 및 상세 아키텍처는 [CONTRIBUTING.md](https://github.com/dev3am/opencode-q/blob/main/CONTRIBUTING.md)를 참조하세요.
 
 ## 라이선스
 
