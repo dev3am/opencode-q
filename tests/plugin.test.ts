@@ -11,6 +11,7 @@ let plugin: any
 
 beforeEach(async () => {
   testDir = mkdtempSync(join(tmpdir(), "opencode-q-plugin-test-"))
+  process.env.OPENCODE_Q_REGISTRY = join(testDir, "registry.json")
   capturedBroadcasts = []
 
   const mockClient = {
@@ -61,6 +62,7 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
+  delete process.env.OPENCODE_Q_REGISTRY
   rmSync(testDir, { recursive: true, force: true })
 })
 

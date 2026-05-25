@@ -2,7 +2,7 @@
 
 **OpenCode 的提示队列插件** — 在 AI 工作时将提示加入队列，完成后通过手动批准依次执行。
 
-[English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md)
+[English](https://github.com/dev3am/opencode-q/blob/main/README.md) | [한국어](https://github.com/dev3am/opencode-q/blob/main/README.ko.md) | [日本語](https://github.com/dev3am/opencode-q/blob/main/README.ja.md)
 
 ---
 
@@ -23,19 +23,15 @@
 - [Bun](https://bun.sh) 1.x
 - OpenCode 1.x
 
-### npm (发布后)
+### npm
 
 ```bash
 npm install opencode-q
 ```
 
-`opencode.json`:
+安装时自动注册到 `~/.config/opencode/plugins/`。重启 OpenCode 即可使用。
 
-```json
-{
-  "plugin": ["opencode-q"]
-}
-```
+> **手动配置:** 在项目 `opencode.json` 中添加: `{ "plugin": ["opencode-q"] }`
 
 ## 使用方法
 
@@ -105,7 +101,7 @@ Web UI 在插件加载时自动启动。
 
 ## 架构
 
-开发设置和详细架构请参阅 [CONTRIBUTING.md](CONTRIBUTING.md)。
+开发设置和详细架构请参阅 [CONTRIBUTING.md](https://github.com/dev3am/opencode-q/blob/main/CONTRIBUTING.md)。
 
 ## 许可证
 

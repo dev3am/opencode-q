@@ -15,7 +15,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function ProjectSidebar({ projects, selectedBaseDir, onSelect }: Props) {
   return (
-    <div style={{ width: 200, borderRight: "1px solid #333", padding: 12, overflowY: "auto" }}>
+    <div style={{ width: 200, borderRight: "1px solid #e0e0e0", padding: 12, overflowY: "auto", background: "#f9f9f9", minHeight: "100vh" }}>
       <div style={{ fontSize: 11, textTransform: "uppercase", color: "#888", marginBottom: 8 }}>Projects</div>
       {projects.map((p) => {
         const name = p.baseDir.split("/").pop() || p.baseDir
@@ -27,11 +27,12 @@ export default function ProjectSidebar({ projects, selectedBaseDir, onSelect }: 
             onClick={() => onSelect(p.baseDir)}
             style={{
               padding: "8px 10px",
-              background: isSelected ? "#2a2a3e" : "transparent",
+              background: isSelected ? "#e8f0fe" : "transparent",
               borderRadius: 6,
               marginBottom: 4,
               cursor: "pointer",
               fontSize: 13,
+              color: "#222",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

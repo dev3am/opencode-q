@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
-import { join } from "node:path"
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, unlinkSync, existsSync } from "node:fs"
+import { join, dirname } from "node:path"
 import { tmpdir } from "node:os"
 import * as http from "node:http"
 import { startServer, resetServerSingleton } from "../src/server"
@@ -63,11 +63,13 @@ describe("REST API Server", () => {
 
   beforeEach(() => {
     testDir = createTestDir()
+    process.env.OPENCODE_Q_REGISTRY = join(testDir, "registry.json")
   })
 
   afterEach(() => {
     server?.close()
     resetServerSingleton()
+    delete process.env.OPENCODE_Q_REGISTRY
     rmSync(testDir, { recursive: true, force: true })
   })
 
@@ -177,11 +179,13 @@ describe("REST API Server with SDK", () => {
 
   beforeEach(() => {
     testDir = createTestDir()
+    process.env.OPENCODE_Q_REGISTRY = join(testDir, "registry.json")
   })
 
   afterEach(() => {
     server?.close()
     resetServerSingleton()
+    delete process.env.OPENCODE_Q_REGISTRY
     rmSync(testDir, { recursive: true, force: true })
   })
 
@@ -285,15 +289,19 @@ describe("Multi-Project Registry", () => {
   let testDir2: string
   let server: http.Server
   let port: number
+  let registryPath: string
 
   beforeEach(() => {
     testDir1 = createTestDir()
     testDir2 = createTestDir()
+    registryPath = join(testDir1, "registry.json")
+    process.env.OPENCODE_Q_REGISTRY = registryPath
   })
 
   afterEach(() => {
     server?.close()
     resetServerSingleton()
+    delete process.env.OPENCODE_Q_REGISTRY
     rmSync(testDir1, { recursive: true, force: true })
     rmSync(testDir2, { recursive: true, force: true })
   })

@@ -2,7 +2,7 @@
 
 **OpenCode용 프롬프트 큐 플러그인** — AI가 작업 중인 동안 프롬프트를 큐에 미리 등록하고, 완료 후 수동 승인으로 순차 실행합니다.
 
-[English](README.md) | [日本語](README.ja.md) | [中文](README.zh.md)
+[English](https://github.com/dev3am/opencode-q/blob/main/README.md) | [日本語](https://github.com/dev3am/opencode-q/blob/main/README.ja.md) | [中文](https://github.com/dev3am/opencode-q/blob/main/README.zh.md)
 
 ---
 
@@ -23,19 +23,15 @@
 - [Bun](https://bun.sh) 1.x
 - OpenCode 1.x
 
-### npm (배포 후)
+### npm
 
 ```bash
 npm install opencode-q
 ```
 
-`opencode.json`:
+설치 시 자동으로 `~/.config/opencode/plugins/`에 등록됩니다. OpenCode를 재시작하면 바로 사용 가능합니다.
 
-```json
-{
-  "plugin": ["opencode-q"]
-}
-```
+> **수동 설정:** 프로젝트 `opencode.json`에 추가: `{ "plugin": ["opencode-q"] }`
 
 ## 사용법
 
@@ -105,7 +101,7 @@ Web UI는 플러그인이 로드될 때 자동으로 시작됩니다.
 
 ## 아키텍처
 
-개발 설정 및 상세 아키텍처는 [CONTRIBUTING.md](CONTRIBUTING.md)를 참조하세요.
+개발 설정 및 상세 아키텍처는 [CONTRIBUTING.md](https://github.com/dev3am/opencode-q/blob/main/CONTRIBUTING.md)를 참조하세요.
 
 ## 라이선스
 

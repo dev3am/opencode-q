@@ -2,10 +2,12 @@ import * as http from "node:http"
 import * as QM from "./queue-manager"
 import * as Storage from "./storage"
 import { SSE_HEARTBEAT_MS } from "./constants"
-import { existsSync, readFileSync, appendFileSync } from "node:fs"
+import { existsSync, readFileSync, appendFileSync, writeFileSync, mkdirSync } from "node:fs"
 import { join, extname, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
+import { homedir } from "node:os"
 import type { SessionStatus, FailedItem, ProjectState, ProjectRegistration } from "./types"
+import { REGISTRY_FILENAME } from "./constants"
 
 const DEBUG_ENABLED = !!process.env.OPENCODE_Q_DEBUG
 const DEBUG_LOG = DEBUG_ENABLED
@@ -34,6 +36,48 @@ const MIME_TYPES: Record<string, string> = {
   ".ico": "image/x-icon",
 }
 
+function registryPath(): string {
+  if (process.env.OPENCODE_Q_REGISTRY) return process.env.OPENCODE_Q_REGISTRY
+  return join(homedir(), ".config", "opencode", REGISTRY_FILENAME)
+}
+
+interface RegistryEntry {
+  baseDir: string
+  sessionId: string
+  status: string
+  realSessionId: string | null
+}
+
+function loadRegistry(): Map<string, ProjectState> {
+  const file = registryPath()
+  if (!existsSync(file)) return new Map()
+  try {
+    const raw = JSON.parse(readFileSync(file, "utf-8")) as { projects: RegistryEntry[] }
+    const map = new Map<string, ProjectState>()
+    for (const entry of raw.projects || []) {
+      const sessions = new Map([[entry.sessionId, { status: entry.status as SessionStatus }]])
+      const aliasToReal = new Map<string, string>()
+      if (entry.realSessionId) aliasToReal.set("default", entry.realSessionId)
+      map.set(entry.baseDir, { baseDir: entry.baseDir, sdkClient: null, sessions, aliasToReal })
+    }
+    return map
+  } catch {
+    return new Map()
+  }
+}
+
+function saveRegistry(projects: Map<string, ProjectState>): void {
+  const dir = dirname(registryPath())
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  const entries: RegistryEntry[] = []
+  for (const p of projects.values()) {
+    for (const [sid, s] of p.sessions) {
+      entries.push({ baseDir: p.baseDir, sessionId: sid, status: s.status, realSessionId: p.aliasToReal.get("default") || null })
+    }
+  }
+  writeFileSync(registryPath(), JSON.stringify({ projects: entries }), "utf-8")
+}
+
 function parseBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
@@ -52,7 +96,7 @@ function jsonResponse(res: http.ServerResponse, body: any, status = 200) {
 export function createHandler(config: ServerConfig) {
   const { webDir } = config
   const sseClients: http.ServerResponse[] = []
-  const projects = new Map<string, ProjectState>()
+  const projects = loadRegistry()
 
   function ensureSession(project: ProjectState, sessionId: string, status: SessionStatus = "unknown") {
     const s = project.sessions.get(sessionId)
@@ -77,11 +121,15 @@ export function createHandler(config: ServerConfig) {
       projects.set(reg.baseDir, state)
       serverLog(`project registered: ${reg.baseDir}`)
     }
+    saveRegistry(projects)
   }
 
   function unregisterProject(baseDir: string): boolean {
     const removed = projects.delete(baseDir)
-    if (removed) serverLog(`project unregistered: ${baseDir}`)
+    if (removed) {
+      serverLog(`project unregistered: ${baseDir}`)
+      saveRegistry(projects)
+    }
     return removed
   }
 
@@ -155,7 +203,12 @@ export function createHandler(config: ServerConfig) {
     let m: RegExpMatchArray | null
 
     if (pathname === "/api/projects" && req.method === "GET") {
-      const list = Array.from(projects.values()).map((p) => {
+      const merged = new Map(projects)
+      const registry = loadRegistry()
+      for (const [baseDir, state] of registry) {
+        if (!merged.has(baseDir)) merged.set(baseDir, state)
+      }
+      const list = Array.from(merged.values()).map((p) => {
         const sessions = Array.from(p.sessions.entries()).map(([sid, s]) => ({ sessionId: sid, status: s.status }))
         return { baseDir: p.baseDir, sessions }
       })
@@ -360,6 +413,13 @@ export function createHandler(config: ServerConfig) {
       return
     }
 
+    if (pathname === "/api/broadcast" && req.method === "POST") {
+      const body = JSON.parse(await parseBody(req))
+      broadcast(body.event, body.data || {})
+      jsonResponse(res, { broadcast: true })
+      return
+    }
+
     if (webDir && serveStaticRes(webDir, pathname, res)) return
 
     jsonResponse(res, { error: "Not found" }, 404)
@@ -390,16 +450,15 @@ export function resetServerSingleton() {
   serverSingleton = null
 }
 
-function listenWithFallback(server: http.Server, port: number): Promise<number> {
+function tryListenPort(server: http.Server, port: number): Promise<number | null> {
   return new Promise((resolve) => {
-    let retried = false
     server.on("error", (err: any) => {
-      if (err.code === "EADDRINUSE" && !retried) {
-        retried = true
-        serverLog(`Port ${port} in use, falling back to random port`)
-        server.listen(0)
+      if (err.code === "EADDRINUSE") {
+        serverLog(`Port ${port} in use, will use remote server`)
+        resolve(null)
       } else {
         serverLog(`Server error: ${err}`)
+        resolve(null)
       }
     })
     server.on("listening", () => {
@@ -408,6 +467,29 @@ function listenWithFallback(server: http.Server, port: number): Promise<number> 
     })
     server.listen(port)
   })
+}
+
+function createRemoteClient(port: number) {
+  const origin = `http://localhost:${port}`
+  return {
+    broadcast: (event: string, data: any) => {
+      fetch(`${origin}/api/broadcast`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event, data }) }).catch(() => {})
+    },
+    registerProject: (reg: ProjectRegistration) => {
+      const merged = loadRegistry()
+      if (!merged.has(reg.baseDir)) {
+        merged.set(reg.baseDir, { baseDir: reg.baseDir, sdkClient: reg.sdkClient, sessions: new Map([[reg.sessionId, { status: "unknown" as SessionStatus }]]), aliasToReal: new Map([["default", reg.sessionId]]) })
+      }
+      saveRegistry(merged)
+      fetch(`${origin}/api/projects/register`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ baseDir: reg.baseDir, sessionId: reg.sessionId }) }).catch(() => {})
+    },
+    unregisterProject: (baseDir: string) => {
+      fetch(`${origin}/api/projects/${encodeURIComponent(baseDir)}`, { method: "DELETE" }).catch(() => {})
+    },
+    getProjectState: (_baseDir: string) => undefined as ProjectState | undefined,
+    setSessionStatus: (_baseDir: string, _sid: string, _status: any, _detail?: any) => {},
+    setSessionIdMapping: (_baseDir: string, _alias: string, _realId: string) => {},
+  }
 }
 
 export async function startServer(config: ServerConfig & { port: number }) {
@@ -426,7 +508,12 @@ export async function startServer(config: ServerConfig & { port: number }) {
     })
   })
 
-  const actualPort = await listenWithFallback(server, port)
+  const actualPort = await tryListenPort(server, port)
+  if (actualPort === null) {
+    serverLog(`Using remote server at localhost:${port}`)
+    return { ...createRemoteClient(port), port, server: null as any }
+  }
+
   serverLog(`server started at http://localhost:${actualPort}`)
 
   serverSingleton = { broadcast, registerProject, unregisterProject, getProjectState, setSessionStatus, setSessionIdMapping, server }
