@@ -4,7 +4,7 @@ interface QueueItemProps {
   item: QueueItemType
   index: number
   onRemove: (id: string) => void
-  onExecute: (id: string) => void
+  onExecute?: (id: string) => void
   dragHandleProps?: any
 }
 
@@ -15,7 +15,9 @@ export default function QueueItem({ item, index, onRemove, onExecute, dragHandle
       <span style={{ color: "#999", minWidth: 20, textAlign: "right" }}>{index + 1}</span>
       <span style={{ color: "#aaa", fontSize: 12 }}>[{item.id}]</span>
       <span style={{ flex: 1 }}>{item.text}</span>
-      <button onClick={() => onExecute(item.id)} style={{ background: "#3b82f6", border: "none", cursor: "pointer", color: "white", fontSize: 12, padding: "4px 10px", borderRadius: 4 }} title="Execute">▶</button>
+      {onExecute && (
+        <button onClick={() => onExecute(item.id)} style={{ background: "#3b82f6", border: "none", cursor: "pointer", color: "white", fontSize: 12, padding: "4px 10px", borderRadius: 4 }} title="Execute">▶</button>
+      )}
       <button onClick={() => onRemove(item.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 16 }} title="Remove">✕</button>
     </div>
   )

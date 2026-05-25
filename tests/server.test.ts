@@ -208,24 +208,24 @@ describe("REST API Server with SDK", () => {
     expect(getRes.json.items.length).toBe(0)
   })
 
-  test("POST queue/next SDK failure reinserts + returns 500 with canRetry", async () => {
+  test("POST queue/next SDK failure reinserts (async)", async () => {
     const p = await boot(createMockSdk(false))
     await request(p, "POST", pq("test-session"), { text: "Will fail" })
     const res = await request(p, "POST", `${pq("test-session")}/next`)
-    expect(res.status).toBe(500)
-    expect(res.json.canRetry).toBe(true)
-    expect(res.json.error).toContain("SDK connection refused")
+    expect(res.status).toBe(200)
+    expect(res.json.executed).toBe(true)
+    await new Promise(r => setTimeout(r, 10))
     const getRes = await request(p, "GET", pq("test-session"))
     expect(getRes.json.items.length).toBe(1)
   })
 
-  test("POST queue/retry after failure returns 500 when SDK fails again", async () => {
+  test("POST queue/retry after failure handles async retry", async () => {
     const p = await boot(createMockSdk(false))
     await request(p, "POST", pq("test-session"), { text: "retry me" })
     await request(p, "POST", `${pq("test-session")}/next`)
     const retryRes = await request(p, "POST", `${pq("test-session")}/retry`)
-    expect(retryRes.status).toBe(500)
-    expect(retryRes.json.retryCount).toBe(1)
+    expect(retryRes.status).toBe(200)
+    expect(retryRes.json.executed).toBe(true)
   })
 
   test("POST queue/skip after failure skips item", async () => {

@@ -40,6 +40,8 @@ export default function App() {
   }, [refreshProjects])
 
   const { items, add, remove, clear, reorder, executeById, retry, skip, sessionStatus, realSessionId, statusDetail } = useQueue(selectedBaseDir, sessionId)
+  const currentProject = projects.find((p) => p.baseDir === selectedBaseDir)
+  const canExecute = currentProject?.hasSdk ?? false
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
@@ -51,7 +53,7 @@ export default function App() {
         {items.length === 0 ? (
           <EmptyState />
         ) : (
-          <QueueList items={items} onRemove={remove} onReorder={reorder} onClear={clear} onExecute={executeById} />
+          <QueueList items={items} onRemove={remove} onReorder={reorder} onClear={clear} onExecute={canExecute ? executeById : undefined} />
         )}
         <AddPrompt onAdd={add} />
       </div>

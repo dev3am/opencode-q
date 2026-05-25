@@ -210,7 +210,7 @@ export function createHandler(config: ServerConfig) {
       }
       const list = Array.from(merged.values()).map((p) => {
         const sessions = Array.from(p.sessions.entries()).map(([sid, s]) => ({ sessionId: sid, status: s.status }))
-        return { baseDir: p.baseDir, sessions }
+        return { baseDir: p.baseDir, sessions, hasSdk: !!p.sdkClient }
       })
       jsonResponse(res, { projects: list })
       return
@@ -277,20 +277,19 @@ export function createHandler(config: ServerConfig) {
       const [item] = data.items.splice(idx, 1)
       Storage.save(baseDir, sid, data)
       if (!project.sdkClient) { data.items.unshift(item); Storage.save(baseDir, sid, data); jsonResponse(res, { error: "SDK not available" }, 503); return }
-      try {
-        const rid = resolveSessionId(project, sid)
-        serverLog(`execute: alias=${sid}, real=${rid}, text="${item.text.slice(0, 50)}"`)
-        await project.sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: item.text }] } })
-        broadcast("queue-updated", { baseDir, sessionId: sid })
-        jsonResponse(res, { executed: true, item })
-      } catch (err) {
-        data.items.unshift(item); Storage.save(baseDir, sid, data)
-        const sessionState = project.sessions.get(sid)
-        if (sessionState) { sessionState.failedItem = { item, retryCount: 0 }; sessionState.status = "error" }
-        broadcast("queue-updated", { baseDir, sessionId: sid })
-        broadcast("session-status", { baseDir, status: "error", sessionId: sid, message: String(err) })
-        jsonResponse(res, { error: String(err), item, canRetry: true }, 500)
-      }
+      const rid = resolveSessionId(project, sid)
+      serverLog(`execute: alias=${sid}, real=${rid}, text="${item.text.slice(0, 50)}"`)
+      project.sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: item.text }] } })
+        .then(() => { broadcast("queue-updated", { baseDir, sessionId: sid }) })
+        .catch((err: any) => {
+          const current = Storage.load(baseDir, sid); current.items.unshift(item); Storage.save(baseDir, sid, current)
+          const ss = project.sessions.get(sid)
+          if (ss) { ss.failedItem = { item, retryCount: 0 }; ss.status = "error" }
+          broadcast("queue-updated", { baseDir, sessionId: sid })
+          broadcast("session-status", { baseDir, status: "error", sessionId: sid, message: String(err) })
+        })
+      broadcast("queue-updated", { baseDir, sessionId: sid })
+      jsonResponse(res, { executed: true, item })
       return
     }
 
@@ -303,20 +302,19 @@ export function createHandler(config: ServerConfig) {
       const item = QM.dequeue(baseDir, sid)
       if (!item) { jsonResponse(res, { executed: false }); return }
       if (!project.sdkClient) { QM.reinsertAtFront(baseDir, sid, item); jsonResponse(res, { error: "SDK not available" }, 503); return }
-      try {
-        const rid = resolveSessionId(project, sid)
-        serverLog(`next: alias=${sid}, real=${rid}`)
-        await project.sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: item.text }] } })
-        broadcast("queue-updated", { baseDir, sessionId: sid })
-        jsonResponse(res, { executed: true, item })
-      } catch (err) {
-        QM.reinsertAtFront(baseDir, sid, item)
-        const sessionState = project.sessions.get(sid)
-        if (sessionState) { sessionState.failedItem = { item, retryCount: 0 }; sessionState.status = "error" }
-        broadcast("queue-updated", { baseDir, sessionId: sid })
-        broadcast("session-status", { baseDir, status: "error", sessionId: sid, message: String(err) })
-        jsonResponse(res, { error: String(err), item, canRetry: true }, 500)
-      }
+      const rid = resolveSessionId(project, sid)
+      serverLog(`next: alias=${sid}, real=${rid}`)
+      project.sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: item.text }] } })
+        .then(() => { broadcast("queue-updated", { baseDir, sessionId: sid }) })
+        .catch((err: any) => {
+          QM.reinsertAtFront(baseDir, sid, item)
+          const ss = project.sessions.get(sid)
+          if (ss) { ss.failedItem = { item, retryCount: 0 }; ss.status = "error" }
+          broadcast("queue-updated", { baseDir, sessionId: sid })
+          broadcast("session-status", { baseDir, status: "error", sessionId: sid, message: String(err) })
+        })
+      broadcast("queue-updated", { baseDir, sessionId: sid })
+      jsonResponse(res, { executed: true, item })
       return
     }
 
@@ -331,16 +329,21 @@ export function createHandler(config: ServerConfig) {
       if (!failed) { jsonResponse(res, { error: "No failed item" }, 404); return }
       if (failed.retryCount >= 3) { jsonResponse(res, { error: "Max retries exceeded", item: failed.item }, 429); return }
       if (!project.sdkClient) { jsonResponse(res, { error: "SDK not available" }, 503); return }
-      try {
-        const rid = resolveSessionId(project, sid)
-        await project.sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: failed.item.text }] } })
-        if (sessionState) { sessionState.failedItem = undefined; sessionState.status = "idle" }
-        broadcast("queue-updated", { baseDir, sessionId: sid })
-        jsonResponse(res, { executed: true, item: failed.item })
-      } catch (err) {
-        failed.retryCount++
-        jsonResponse(res, { error: String(err), retryCount: failed.retryCount }, 500)
-      }
+      const rid2 = resolveSessionId(project, sid)
+      const failedItem = { ...failed.item }
+      project.sdkClient.prompt({ path: { id: rid2 }, body: { parts: [{ type: "text", text: failed.item.text }] } })
+        .then(() => {
+          const ss = project.sessions.get(sid)
+          if (ss) { ss.failedItem = undefined; ss.status = "idle" }
+          broadcast("queue-updated", { baseDir, sessionId: sid })
+        })
+        .catch(() => {
+          const ss = project.sessions.get(sid)
+          if (ss?.failedItem) ss.failedItem.retryCount++
+        })
+      if (sessionState) sessionState.failedItem = undefined
+      broadcast("queue-updated", { baseDir, sessionId: sid })
+      jsonResponse(res, { executed: true, item: failedItem })
       return
     }
 

@@ -10,6 +10,7 @@ export interface QueueItem {
 export interface ProjectInfo {
   baseDir: string
   sessions: Array<{ sessionId: string; status: string }>
+  hasSdk?: boolean
 }
 
 function projectPath(baseDir: string, suffix: string): string {

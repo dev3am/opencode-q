@@ -9,10 +9,10 @@ interface QueueListProps {
   onRemove: (id: string) => void
   onReorder: (from: number, to: number) => void
   onClear: () => void
-  onExecute: (id: string) => void
+  onExecute?: (id: string) => void
 }
 
-function SortableItem({ item, index, onRemove, onExecute }: { item: QueueItemType; index: number; onRemove: (id: string) => void; onExecute: (id: string) => void }) {
+function SortableItem({ item, index, onRemove, onExecute }: { item: QueueItemType; index: number; onRemove: (id: string) => void; onExecute?: (id: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id })
   const style = { transform: CSS.Transform.toString(transform), transition }
   return (
