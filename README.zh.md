@@ -26,12 +26,12 @@
 ### npm
 
 ```bash
-npm install opencode-q
+npm install -g opencode-q
 ```
 
 安装时自动注册到 `~/.config/opencode/plugins/`。重启 OpenCode 即可使用。
 
-> **手动配置:** 在项目 `opencode.json` 中添加: `{ "plugin": ["opencode-q"] }`
+> **注意：** 由于插件注册到全局路径（`~/.config/opencode/plugins/`），因此必须使用全局安装（`-g`）。不支持按项目安装。
 
 ## 使用方法
 
