@@ -30,12 +30,12 @@
 ### npm
 
 ```bash
-npm install opencode-q
+npm install -g opencode-q
 ```
 
 The plugin auto-installs to `~/.config/opencode/plugins/` via postinstall. Just restart OpenCode and it works.
 
-> **Manual alternative:** Add to your project's `opencode.json`: `{ "plugin": ["opencode-q"] }`
+> **Note:** Global install (`-g`) is required because the plugin registers globally at `~/.config/opencode/plugins/`. Per-project install is not supported.
 
 ## Usage
 

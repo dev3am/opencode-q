@@ -11,6 +11,7 @@ export interface ProjectInfo {
   baseDir: string
   sessions: Array<{ sessionId: string; status: string }>
   hasSdk?: boolean
+  hasCallback?: boolean
 }
 
 function projectPath(baseDir: string, suffix: string): string {
@@ -39,6 +40,16 @@ export async function addItem(baseDir: string, sessionId: string, text: string):
 
 export async function removeItem(baseDir: string, sessionId: string, id: string): Promise<void> {
   await fetch(projectPath(baseDir, `/queue/${sessionId}/${id}`), { method: "DELETE" })
+}
+
+export async function updateItem(baseDir: string, sessionId: string, id: string, text: string): Promise<{ item: QueueItem }> {
+  const res = await fetch(projectPath(baseDir, `/queue/${sessionId}/${id}`), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  })
+  if (!res.ok) throw new Error((await res.json()).error)
+  return res.json()
 }
 
 export async function clearQueue(baseDir: string, sessionId: string): Promise<void> {

@@ -27,6 +27,11 @@ export function useQueue(baseDir: string, sessionId: string) {
     await fetchItems()
   }, [baseDir, sessionId, fetchItems])
 
+  const update = useCallback(async (id: string, text: string) => {
+    await api.updateItem(baseDir, sessionId, id, text)
+    await fetchItems()
+  }, [baseDir, sessionId, fetchItems])
+
   const clear = useCallback(async () => {
     await api.clearQueue(baseDir, sessionId)
     await fetchItems()
@@ -52,5 +57,5 @@ export function useQueue(baseDir: string, sessionId: string) {
     await fetchItems()
   }, [baseDir, sessionId, fetchItems])
 
-  return { items, add, remove, clear, reorder, executeById, retry, skip, sessionStatus, realSessionId, statusDetail }
+  return { items, add, remove, update, clear, reorder, executeById, retry, skip, sessionStatus, realSessionId, statusDetail }
 }

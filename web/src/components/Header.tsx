@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
+import { useTranslation, type Lang } from "../i18n/useTranslation"
 import type { StatusDetail } from "../hooks/useSSE"
 
 interface HeaderProps {
@@ -23,69 +24,77 @@ const STATUS_COLORS: Record<string, string> = {
   unknown: "#9ca3af",
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  idle: "idle",
-  busy: "busy",
-  error: "error",
-  "waiting-permission": "permission",
-  "waiting-question": "question",
-  unknown: "unknown",
+const STATUS_TRANSLATION_KEYS: Record<string, string> = {
+  idle: "status.idle",
+  busy: "status.busy",
+  error: "status.error",
+  "waiting-permission": "status.waiting-permission",
+  "waiting-question": "status.waiting-question",
+  unknown: "status.unknown",
 }
 
 export default function Header({ sessionId, realSessionId, sessionStatus, statusDetail, onRetry, onSkip }: HeaderProps) {
-  const [expanded, setExpanded] = useState(false)
+  const { t, lang, setLang } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
   const color = STATUS_COLORS[sessionStatus] || STATUS_COLORS.unknown
-  const label = STATUS_LABELS[sessionStatus] || sessionStatus
+  const labelKey = STATUS_TRANSLATION_KEYS[sessionStatus] || sessionStatus
   const isError = sessionStatus === "error"
+  const isBusy = sessionStatus === "busy"
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [])
+
+  const langLabels: Record<Lang, string> = { en: "EN", ko: "한국어", ja: "日本語", zh: "中文" }
 
   return (
-    <div style={{ marginBottom: 16, padding: "8px 0", borderBottom: "1px solid #e0e0e0" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ margin: 0, fontSize: 18, cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>
-          opencode-q {expanded ? "▾" : "›"}
-        </h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 13, color: "#666", background: "#f0f0f0", padding: "2px 8px", borderRadius: 4 }}>
+    <div className="mb-4 pb-2 border-b border-gray-200">
+      <div className="flex justify-between items-center">
+        <h1 className="m-0 text-lg font-bold text-gray-800">{t("app.title")}</h1>
+        <div className="flex items-center gap-2">
+          <div ref={ref} className="relative">
+            <button
+              onClick={() => setOpen(!open)}
+              className="text-[11px] text-gray-400 hover:text-gray-600 bg-transparent border border-gray-200 rounded px-1.5 py-0.5 cursor-pointer transition-colors"
+            >{langLabels[lang]}</button>
+            {open && (
+              <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-sm z-50 py-0.5 min-w-[68px]">
+                {(Object.keys(langLabels) as Lang[]).map((l) => (
+                  <button
+                    key={l}
+                    onClick={() => { setLang(l); setOpen(false) }}
+                    className={`block w-full text-left px-3 py-1 text-xs cursor-pointer transition-colors ${l === lang ? "text-gray-800 bg-gray-100" : "text-gray-500 hover:bg-gray-50"}`}
+                  >{langLabels[l]}</button>
+                ))}
+              </div>
+            )}
+          </div>
+          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
             {realSessionId ? shortId(realSessionId) : sessionId}
           </span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, padding: "2px 8px", borderRadius: 4, background: color + "18", color }}>
-            <span style={{
-              width: 7, height: 7, borderRadius: "50%", background: color,
-              animation: sessionStatus === "busy" ? "pulse 1.5s infinite" : "none",
-            }} />
-            {label}
+          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded" style={{ background: color + "18", color }}>
+            <span className={`w-1.5 h-1.5 rounded-full ${isBusy ? "animate-pulse" : ""}`} style={{ background: color }} />
+            {t(labelKey)}
           </span>
         </div>
       </div>
 
-      {expanded && !isError && statusDetail.prompt && (
-        <div style={{ marginTop: 8, fontSize: 13, color: "#555", paddingLeft: 8, borderLeft: "2px solid #e0e0e0" }}>
-          <div>마지막 실행: "{statusDetail.prompt.length > 50 ? statusDetail.prompt.slice(0, 50) + "..." : statusDetail.prompt}"</div>
-        </div>
-      )}
-
-      {expanded && isError && (
-        <div style={{ marginTop: 8, fontSize: 13, color: "#555", paddingLeft: 8, borderLeft: "2px solid #ef4444" }}>
-          <div style={{ color: "#ef4444", marginBottom: 6 }}>
-            실행 실패: {statusDetail.message || "unknown error"}
+      {isError && (
+        <div className="mt-2 pl-2 border-l-2 border-red-500">
+          <div className="text-xs text-red-600 mb-1">
+            {t("header.executionFailed")}: {statusDetail.message || t("header.unknownError")}
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={onRetry} style={{ padding: "4px 12px", fontSize: 12, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer" }}>
-              재시도
-            </button>
-            <button onClick={onSkip} style={{ padding: "4px 12px", fontSize: 12, background: "#6b7280", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer" }}>
-              건너뛰기
-            </button>
+          <div className="flex gap-2">
+            <button onClick={onRetry} className="px-3 py-1 text-xs font-medium bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors cursor-pointer">{t("header.retry")}</button>
+            <button onClick={onSkip} className="px-3 py-1 text-xs font-medium bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors cursor-pointer">{t("header.skip")}</button>
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-      `}</style>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 {
   "name": "opencode-q",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Prompt queue plugin for OpenCode",
   "keywords": [
     "opencode",

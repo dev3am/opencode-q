@@ -26,12 +26,12 @@
 ### npm
 
 ```bash
-npm install opencode-q
+npm install -g opencode-q
 ```
 
 설치 시 자동으로 `~/.config/opencode/plugins/`에 등록됩니다. OpenCode를 재시작하면 바로 사용 가능합니다.
 
-> **수동 설정:** 프로젝트 `opencode.json`에 추가: `{ "plugin": ["opencode-q"] }`
+> **참고:** 플러그인이 전역 경로(`~/.config/opencode/plugins/`)에 등록되므로 반드시 글로벌 설치(`-g`)가 필요합니다. 프로젝트별 설치는 지원하지 않습니다.
 
 ## 사용법
 

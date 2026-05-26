@@ -1,8 +1,11 @@
+import { useTranslation } from "../i18n/useTranslation"
+
 export default function EmptyState() {
+  const { t } = useTranslation()
   return (
-    <div style={{ textAlign: "center", padding: "48px 0", color: "#999" }}>
-      <p style={{ fontSize: 16, margin: "0 0 4px" }}>큐가 비어있습니다.</p>
-      <p style={{ fontSize: 14, margin: 0 }}>프롬프트를 추가해보세요.</p>
+    <div className="text-center py-12 text-gray-400">
+      <p className="text-base m-0 mb-1">{t("queue.empty")}</p>
+      <p className="text-sm m-0">{t("queue.emptyHint")}</p>
     </div>
   )
 }

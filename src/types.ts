@@ -26,6 +26,7 @@ export interface QueueData {
 export interface ProjectState {
   baseDir: string
   sdkClient: any
+  callbackUrl?: string
   sessions: Map<string, {
     status: SessionStatus
     failedItem?: FailedItem
@@ -37,4 +38,5 @@ export interface ProjectRegistration {
   baseDir: string
   sdkClient: any
   sessionId: string
+  callbackUrl?: string
 }

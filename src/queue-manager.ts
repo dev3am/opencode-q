@@ -58,6 +58,16 @@ export function remove(baseDir: string, sessionId: string, id: string): boolean 
   return true
 }
 
+export function update(baseDir: string, sessionId: string, id: string, text: string): QueueItem | null {
+  if (!text.trim()) throw new Error("프롬프트를 입력해주세요")
+  const data = Storage.load(baseDir, sessionId)
+  const item = data.items.find((item) => item.id === id)
+  if (!item) return null
+  item.text = text
+  Storage.save(baseDir, sessionId, data)
+  return item
+}
+
 export function clear(baseDir: string, sessionId: string): void {
   const data = Storage.load(baseDir, sessionId)
   data.items = []

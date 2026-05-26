@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/useTranslation"
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
@@ -7,22 +8,24 @@ import QueueItemComponent from "./QueueItem"
 interface QueueListProps {
   items: QueueItemType[]
   onRemove: (id: string) => void
+  onUpdate: (id: string, text: string) => void
   onReorder: (from: number, to: number) => void
   onClear: () => void
   onExecute?: (id: string) => void
 }
 
-function SortableItem({ item, index, onRemove, onExecute }: { item: QueueItemType; index: number; onRemove: (id: string) => void; onExecute?: (id: string) => void }) {
+function SortableItem({ item, index, onRemove, onUpdate, onExecute }: { item: QueueItemType; index: number; onRemove: (id: string) => void; onUpdate: (id: string, text: string) => void; onExecute?: (id: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id })
   const style = { transform: CSS.Transform.toString(transform), transition }
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
-      <QueueItemComponent item={item} index={index} onRemove={onRemove} onExecute={onExecute} dragHandleProps={listeners} />
+      <QueueItemComponent item={item} index={index} onRemove={onRemove} onUpdate={onUpdate} onExecute={onExecute} dragHandleProps={listeners} />
     </div>
   )
 }
 
-export default function QueueList({ items, onRemove, onReorder, onClear, onExecute }: QueueListProps) {
+export default function QueueList({ items, onRemove, onUpdate, onReorder, onClear, onExecute }: QueueListProps) {
+  const { t } = useTranslation()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   function handleDragEnd(event: any) {
@@ -35,14 +38,16 @@ export default function QueueList({ items, onRemove, onReorder, onClear, onExecu
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-        <button onClick={onClear} style={{ background: "none", border: "1px solid #ddd", cursor: "pointer", padding: "4px 8px", borderRadius: 4, fontSize: 12, color: "#666" }}>Clear all</button>
+      <div className="flex justify-end mb-2">
+        <button onClick={onClear} className="bg-transparent border border-gray-300 cursor-pointer px-2 py-1 rounded text-xs text-gray-500 hover:text-gray-700 hover:border-gray-400 transition-colors">{t("queue.clearAll")}</button>
       </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-          {items.map((item, index) => (
-            <SortableItem key={item.id} item={item} index={index} onRemove={onRemove} onExecute={onExecute} />
-          ))}
+          <div className="flex flex-col gap-1">
+            {items.map((item, index) => (
+              <SortableItem key={item.id} item={item} index={index} onRemove={onRemove} onUpdate={onUpdate} onExecute={onExecute} />
+            ))}
+          </div>
         </SortableContext>
       </DndContext>
     </div>
