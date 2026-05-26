@@ -160,7 +160,15 @@ export function createHandler(config: ServerConfig) {
 
   function requireProject(encodedBaseDir: string): { baseDir: string; project: ProjectState } | null {
     const baseDir = decodeURIComponent(encodedBaseDir)
-    const project = getProjectState(baseDir)
+    let project = getProjectState(baseDir)
+    if (!project) {
+      const registry = loadRegistry()
+      const fromRegistry = registry.get(baseDir)
+      if (fromRegistry) {
+        projects.set(baseDir, fromRegistry)
+        project = fromRegistry
+      }
+    }
     if (!project) return null
     return { baseDir, project }
   }

@@ -358,4 +358,17 @@ describe("Multi-Project Registry", () => {
     const res = await request(p, "GET", "/api/projects")
     expect(res.json.projects).toHaveLength(1)
   })
+
+  test("registry-only project is accessible via requireProject fallback", async () => {
+    writeFileSync(registryPath, JSON.stringify({
+      projects: [{ baseDir: testDir2, sessionId: "default", status: "idle", realSessionId: null, callbackUrl: "http://localhost:9999" }]
+    }))
+    const { port: p } = await boot()
+    await request(p, "POST", "/api/projects/register", { baseDir: testDir1 })
+    const listRes = await request(p, "GET", "/api/projects")
+    expect(listRes.json.projects).toHaveLength(2)
+    const qRes = await request(p, "GET", `/api/projects/${encodeURIComponent(testDir2)}/queue/default`)
+    expect(qRes.status).toBe(200)
+    expect(qRes.json.items).toEqual([])
+  })
 })
