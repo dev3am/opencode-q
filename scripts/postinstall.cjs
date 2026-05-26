@@ -1,4 +1,4 @@
-const { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, cpSync } = require("node:fs")
+const { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, cpSync, rmSync } = require("node:fs")
 const { join, resolve } = require("node:path")
 
 const GLOBAL_PLUGIN_DIR = join(process.env.HOME || "~", ".config", "opencode", "plugins")
@@ -24,7 +24,7 @@ try {
 
   if (existsSync(webSource)) {
     if (existsSync(webDest)) {
-      unlinkSync(webDest)
+      rmSync(webDest, { recursive: true, force: true })
     }
     cpSync(webSource, webDest, { recursive: true })
     console.log(`opencode-q: web UI copied to ${webDest}`)
