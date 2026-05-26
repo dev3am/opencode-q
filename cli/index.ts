@@ -27,7 +27,7 @@ function request(method: string, path: string, body?: unknown): Promise<{ status
   return new Promise((resolve, reject) => {
     const bodyStr = body !== undefined ? JSON.stringify(body) : undefined
     const opts: http.RequestOptions = {
-      hostname: "localhost",
+      hostname: "127.0.0.1",
       port: serverPort,
       path,
       method,

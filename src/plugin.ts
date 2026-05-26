@@ -76,13 +76,13 @@ function startCallbackServer(client: any, mainPort: number, baseDir: string): Pr
             client.tui.appendPrompt({ body: { text } })
               .then(() => client.tui.submitPrompt())
               .then(async () => {
-                await fetch(`http://localhost:${mainPort}/api/projects/${encodeURIComponent(baseDir)}/queue/default/execution-result`, {
+                await fetch(`http://127.0.0.1:${mainPort}/api/projects/${encodeURIComponent(baseDir)}/queue/default/execution-result`, {
                   method: "POST", headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ success: true }),
                 })
               })
               .catch(async (err: any) => {
-                await fetch(`http://localhost:${mainPort}/api/projects/${encodeURIComponent(baseDir)}/queue/default/execution-result`, {
+                await fetch(`http://127.0.0.1:${mainPort}/api/projects/${encodeURIComponent(baseDir)}/queue/default/execution-result`, {
                   method: "POST", headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ success: false, error: String(err), item: { text } }),
                 })
@@ -99,10 +99,10 @@ function startCallbackServer(client: any, mainPort: number, baseDir: string): Pr
       res.writeHead(404, { "Content-Type": "application/json" })
       res.end(JSON.stringify({ error: "Not found" }))
     })
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address()
       const port = typeof addr === "object" && addr ? addr.port : 0
-      resolve({ port, url: `http://localhost:${port}` })
+      resolve({ port, url: `http://127.0.0.1:${port}` })
     })
     server.on("error", reject)
   })

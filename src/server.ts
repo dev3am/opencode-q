@@ -631,12 +631,12 @@ function tryListenPort(server: http.Server, port: number): Promise<number | null
       const addr = server.address()
       resolve(typeof addr === "object" && addr ? addr.port : port)
     })
-    server.listen(port)
+    server.listen(port, "127.0.0.1")
   })
 }
 
 function createRemoteClient(port: number) {
-  const origin = `http://localhost:${port}`
+  const origin = `http://127.0.0.1:${port}`
   return {
     broadcast: (event: string, data: any) => {
       fetch(`${origin}/api/broadcast`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event, data }) }).catch(() => {})
@@ -689,11 +689,11 @@ export async function startServer(config: ServerConfig & { port: number }) {
 
   const actualPort = await tryListenPort(server, port)
   if (actualPort === null) {
-    serverLog(`Using remote server at localhost:${port}`)
+    serverLog(`Using remote server at 127.0.0.1:${port}`)
     return { ...createRemoteClient(port), port, server: null as any }
   }
 
-  serverLog(`server started at http://localhost:${actualPort}`)
+  serverLog(`server started at http://127.0.0.1:${actualPort}`)
 
   serverSingleton = { broadcast, registerProject, unregisterProject, getProjectState, setSessionStatus, setSessionIdMapping, server }
   return { broadcast, registerProject, unregisterProject, getProjectState, setSessionStatus, setSessionIdMapping, server, port: actualPort }
