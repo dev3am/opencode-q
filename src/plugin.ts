@@ -7,6 +7,7 @@ import { PREVIEW_LENGTH, DEFAULT_PORT, STORAGE_DIR } from "./constants"
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
+import { homedir } from "node:os"
 
 const STATUS_MAP: Record<string, string> = {
   busy: "busy",
@@ -262,6 +263,7 @@ export default (async ({ client, directory, options }: any) => {
 function resolveWebDir(): string | undefined {
   const __dirname = dirname(fileURLToPath(import.meta.url))
   const candidates = [
+    join(homedir(), ".config", "opencode", "plugins", "web"),
     join(__dirname, "web"),
     join(__dirname, "..", "..", "web", "dist"),
     join(process.cwd(), "web", "dist"),
