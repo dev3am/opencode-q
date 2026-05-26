@@ -17,7 +17,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function ProjectSidebar({ projects, selectedBaseDir, onSelect }: Props) {
   return (
-    <div className="w-48 border-r border-gray-200 p-3 overflow-y-auto bg-gray-50 min-h-screen shrink-0">
+    <div className="p-3 overflow-y-auto bg-gray-50 min-h-screen h-full">
       <div className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Projects</div>
       {projects.map((p) => {
         const name = p.baseDir.split("/").pop() || p.baseDir
