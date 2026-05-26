@@ -17,16 +17,16 @@ export default function App() {
 
   const refreshProjects = useCallback(() => {
     fetchProjects().then((data) => {
+      const active = data.projects.filter((p) => p.hasSdk || p.hasCallback)
       setProjects((prev) => {
-        const next = data.projects
         setSelectedBaseDir((cur) => {
-          if (!cur && next.length > 0) return next[0].baseDir
-          if (cur && !next.some((p) => p.baseDir === cur)) {
-            return next.length > 0 ? next[0].baseDir : ""
+          if (!cur && active.length > 0) return active[0].baseDir
+          if (cur && !active.some((p) => p.baseDir === cur)) {
+            return active.length > 0 ? active[0].baseDir : ""
           }
           return cur
         })
-        return next
+        return active
       })
     })
   }, [])
@@ -36,12 +36,24 @@ export default function App() {
   useEffect(() => {
     const es = createSSE()
     es.addEventListener("projects-updated", () => { refreshProjects() })
+    es.addEventListener("session-status", ((e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data)
+        setProjects((prev) =>
+          prev.map((p) =>
+            p.baseDir === data.baseDir
+              ? { ...p, sessions: p.sessions.map((s) => s.sessionId === data.sessionId ? { ...s, status: data.status } : s) }
+              : p
+          )
+        )
+      } catch {}
+    }) as EventListener)
     return () => es.close()
   }, [refreshProjects])
 
   const { items, add, remove, clear, reorder, executeById, retry, skip, sessionStatus, realSessionId, statusDetail } = useQueue(selectedBaseDir, sessionId)
   const currentProject = projects.find((p) => p.baseDir === selectedBaseDir)
-  const canExecute = currentProject?.hasSdk ?? false
+  const canExecute = (currentProject?.hasSdk || currentProject?.hasCallback) ?? false
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
