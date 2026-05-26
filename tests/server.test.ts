@@ -26,7 +26,7 @@ function request(
   return new Promise((resolve, reject) => {
     const bodyStr = body !== undefined ? JSON.stringify(body) : undefined
     const opts: http.RequestOptions = {
-      hostname: "localhost",
+      hostname: "127.0.0.1",
       port,
       path,
       method,
@@ -363,7 +363,7 @@ describe("Multi-Project Registry", () => {
 
   test("registry-only project is accessible via requireProject fallback", async () => {
     writeFileSync(registryPath, JSON.stringify({
-      projects: [{ baseDir: testDir2, sessionId: "default", status: "idle", realSessionId: null, callbackUrl: "http://localhost:9999" }]
+      projects: [{ baseDir: testDir2, sessionId: "default", status: "idle", realSessionId: null, callbackUrl: "http://127.0.0.1:9999" }]
     }))
     const { port: p } = await boot()
     await request(p, "POST", "/api/projects/register", { baseDir: testDir1 })

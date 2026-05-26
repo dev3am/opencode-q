@@ -29,16 +29,16 @@ export default function App() {
 
   const refreshProjects = useCallback(() => {
     fetchProjects().then((data) => {
-      const active = data.projects.filter((p) => p.hasSdk || p.hasCallback)
+      const allProjects = data.projects
       setProjects((prev) => {
         setSelectedBaseDir((cur) => {
-          if (!cur && active.length > 0) return active[0].baseDir
-          if (cur && !active.some((p) => p.baseDir === cur)) {
-            return active.length > 0 ? active[0].baseDir : ""
+          if (!cur && allProjects.length > 0) return allProjects[0].baseDir
+          if (cur && !allProjects.some((p) => p.baseDir === cur)) {
+            return allProjects.length > 0 ? allProjects[0].baseDir : ""
           }
           return cur
         })
-        return active
+        return allProjects
       })
     })
   }, [])
