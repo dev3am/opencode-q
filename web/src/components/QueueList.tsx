@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/useTranslation"
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
@@ -24,6 +25,7 @@ function SortableItem({ item, index, onRemove, onUpdate, onExecute }: { item: Qu
 }
 
 export default function QueueList({ items, onRemove, onUpdate, onReorder, onClear, onExecute }: QueueListProps) {
+  const { t } = useTranslation()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   function handleDragEnd(event: any) {
@@ -37,7 +39,7 @@ export default function QueueList({ items, onRemove, onUpdate, onReorder, onClea
   return (
     <div>
       <div className="flex justify-end mb-2">
-        <button onClick={onClear} className="bg-transparent border border-gray-300 cursor-pointer px-2 py-1 rounded text-xs text-gray-500 hover:text-gray-700 hover:border-gray-400 transition-colors">Clear all</button>
+        <button onClick={onClear} className="bg-transparent border border-gray-300 cursor-pointer px-2 py-1 rounded text-xs text-gray-500 hover:text-gray-700 hover:border-gray-400 transition-colors">{t("queue.clearAll")}</button>
       </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>

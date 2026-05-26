@@ -1,4 +1,5 @@
 import type { ProjectInfo } from "../api/client"
+import { useTranslation } from "../i18n/useTranslation"
 
 interface Props {
   projects: ProjectInfo[]
@@ -16,9 +17,10 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export default function ProjectSidebar({ projects, selectedBaseDir, onSelect }: Props) {
+  const { t } = useTranslation()
   return (
     <div className="p-3 overflow-y-auto bg-gray-50 min-h-screen h-full">
-      <div className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Projects</div>
+      <div className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold mb-2">{t("sidebar.projects")}</div>
       {projects.map((p) => {
         const name = p.baseDir.split("/").pop() || p.baseDir
         const isSelected = p.baseDir === selectedBaseDir

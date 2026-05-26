@@ -1,10 +1,12 @@
 import { useState } from "react"
+import { useTranslation } from "../i18n/useTranslation"
 
 interface AddPromptProps {
   onAdd: (text: string) => Promise<void>
 }
 
 export default function AddPrompt({ onAdd }: AddPromptProps) {
+  const { t } = useTranslation()
   const [text, setText] = useState("")
 
   async function submit() {
@@ -29,7 +31,7 @@ export default function AddPrompt({ onAdd }: AddPromptProps) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="프롬프트를 입력하세요... (Shift+Enter로 개행)"
+          placeholder={t("prompt.placeholder")}
           rows={2}
           className="w-full px-4 pt-3 pb-1 border-none outline-none text-sm resize-none bg-transparent"
         />
@@ -39,7 +41,7 @@ export default function AddPrompt({ onAdd }: AddPromptProps) {
             disabled={!hasText}
             className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed bg-gray-800 text-white hover:bg-gray-700"
           >
-            추가 →
+            {t("prompt.add")} →
           </button>
         </div>
       </div>
