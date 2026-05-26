@@ -373,4 +373,14 @@ describe("Multi-Project Registry", () => {
     expect(qRes.status).toBe(200)
     expect(qRes.json.items).toEqual([])
   })
+
+  test("project is accessible even if leading slash is omitted in request", async () => {
+    const absDir = testDir1.startsWith("/") ? testDir1 : "/" + testDir1
+    const cleanDir = absDir.slice(1)
+    const { port: p } = await boot()
+    await request(p, "POST", "/api/projects/register", { baseDir: absDir })
+    const res = await request(p, "GET", `/api/projects/${encodeURIComponent(cleanDir)}/queue/default`)
+    expect(res.status).toBe(200)
+    expect(res.json.items).toEqual([])
+  })
 })

@@ -146,7 +146,10 @@ export function createHandler(config: ServerConfig) {
   }
 
   function unregisterProject(baseDir: string): boolean {
-    const removed = projects.delete(baseDir)
+    let removed = projects.delete(baseDir)
+    if (!removed && !baseDir.startsWith("/")) {
+      removed = projects.delete("/" + baseDir)
+    }
     if (removed) {
       serverLog(`project unregistered: ${baseDir}`)
       saveRegistry(projects)
@@ -155,22 +158,31 @@ export function createHandler(config: ServerConfig) {
   }
 
   function getProjectState(baseDir: string): ProjectState | undefined {
-    return projects.get(baseDir)
+    let state = projects.get(baseDir)
+    if (!state && !baseDir.startsWith("/")) {
+      state = projects.get("/" + baseDir)
+    }
+    return state
   }
 
   function requireProject(encodedBaseDir: string): { baseDir: string; project: ProjectState } | null {
-    const baseDir = decodeURIComponent(encodedBaseDir)
+    let baseDir = decodeURIComponent(encodedBaseDir)
     let project = getProjectState(baseDir)
+    if (!project && !baseDir.startsWith("/")) {
+      project = getProjectState("/" + baseDir)
+    }
     if (!project) {
       const registry = loadRegistry()
-      const fromRegistry = registry.get(baseDir)
-      if (fromRegistry) {
-        projects.set(baseDir, fromRegistry)
-        project = fromRegistry
+      project = registry.get(baseDir)
+      if (!project && !baseDir.startsWith("/")) {
+        project = registry.get("/" + baseDir)
+      }
+      if (project) {
+        projects.set(project.baseDir, project)
       }
     }
     if (!project) return null
-    return { baseDir, project }
+    return { baseDir: project.baseDir, project }
   }
 
   function resolveSessionId(project: ProjectState, sid: string): string {
