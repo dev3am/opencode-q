@@ -1,0 +1,12 @@
+node_modules/
+dist/
+web/dist/
+web/node_modules/
+.opencode/
+.claude/
+*.log
+.DS_Store
+docs/
+AGENTS.md
+COMPOUND.md
+package-lock.json
