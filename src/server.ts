@@ -117,7 +117,7 @@ export function createHandler(config: ServerConfig) {
 
   const healthCheckInterval = setInterval(healthCheckCallbacks, 15000)
 
-  function ensureSession(project: ProjectState, sessionId: string, status: SessionStatus = "unknown") {
+  function ensureSession(project: ProjectState, sessionId: string, status: SessionStatus = "idle") {
     const s = project.sessions.get(sessionId)
     if (s) s.status = status
     else project.sessions.set(sessionId, { status })
@@ -136,7 +136,7 @@ export function createHandler(config: ServerConfig) {
         baseDir: reg.baseDir,
         sdkClient: reg.sdkClient,
         callbackUrl: reg.callbackUrl,
-        sessions: new Map([[reg.sessionId, { status: "unknown" as SessionStatus }]]),
+        sessions: new Map([[reg.sessionId, { status: "idle" as SessionStatus }]]),
         aliasToReal: new Map([["default", reg.sessionId]]),
       }
       projects.set(reg.baseDir, state)
@@ -591,7 +591,7 @@ function createRemoteClient(port: number) {
     registerProject: (reg: ProjectRegistration) => {
       const merged = loadRegistry()
       if (!merged.has(reg.baseDir)) {
-        merged.set(reg.baseDir, { baseDir: reg.baseDir, sdkClient: reg.sdkClient, callbackUrl: reg.callbackUrl, sessions: new Map([[reg.sessionId, { status: "unknown" as SessionStatus }]]), aliasToReal: new Map([["default", reg.sessionId]]) })
+        merged.set(reg.baseDir, { baseDir: reg.baseDir, sdkClient: reg.sdkClient, callbackUrl: reg.callbackUrl, sessions: new Map([[reg.sessionId, { status: "idle" as SessionStatus }]]), aliasToReal: new Map([["default", reg.sessionId]]) })
       } else {
         const existing = merged.get(reg.baseDir)!
         if (reg.callbackUrl) existing.callbackUrl = reg.callbackUrl

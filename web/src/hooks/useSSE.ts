@@ -7,7 +7,7 @@ export interface StatusDetail {
 }
 
 export function useSSE(baseDir: string, sessionId: string, onUpdate: () => void) {
-  const [sessionStatus, setSessionStatus] = useState<string>("unknown")
+  const [sessionStatus, setSessionStatus] = useState<string>("idle")
   const [realSessionId, setRealSessionId] = useState<string | null>(null)
   const [statusDetail, setStatusDetail] = useState<StatusDetail>({})
 

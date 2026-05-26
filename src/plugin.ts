@@ -68,10 +68,12 @@ function startCallbackServer(client: any, mainPort: number, baseDir: string): Pr
         req.on("data", (c: Buffer) => chunks.push(c))
         req.on("end", async () => {
           try {
-            const { text, realSessionId } = JSON.parse(Buffer.concat(chunks).toString())
+            const { text } = JSON.parse(Buffer.concat(chunks).toString())
             res.writeHead(202, { "Content-Type": "application/json" })
             res.end(JSON.stringify({ accepted: true }))
-            client.session.prompt({ path: { id: realSessionId }, body: { parts: [{ type: "text", text }] } })
+
+            client.tui.appendPrompt({ body: { text } })
+              .then(() => client.tui.submitPrompt())
               .then(async () => {
                 await fetch(`http://localhost:${mainPort}/api/projects/${encodeURIComponent(baseDir)}/queue/default/execution-result`, {
                   method: "POST", headers: { "Content-Type": "application/json" },

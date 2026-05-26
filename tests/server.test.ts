@@ -155,11 +155,11 @@ describe("REST API Server", () => {
     expect(res.json.executed).toBe(false)
   })
 
-  test("GET session returns unknown status", async () => {
+  test("GET session returns idle status by default", async () => {
     const p = await boot()
     const res = await request(p, "GET", sessionUrl("test-session"))
     expect(res.status).toBe(200)
-    expect(res.json.status).toBe("unknown")
+    expect(res.json.status).toBe("idle")
   })
 
   test("404 for unknown routes", async () => {
