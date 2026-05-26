@@ -7,10 +7,12 @@ interface Props {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  idle: "#4ade80",
-  busy: "#facc15",
-  error: "#f87171",
-  unknown: "#888",
+  idle: "#22c55e",
+  busy: "#3b82f6",
+  error: "#ef4444",
+  "waiting-permission": "#f97316",
+  "waiting-question": "#f97316",
+  unknown: "#9ca3af",
 }
 
 export default function ProjectSidebar({ projects, selectedBaseDir, onSelect }: Props) {
