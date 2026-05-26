@@ -23,15 +23,14 @@ export default function QueueItem({ item, index, onRemove, onUpdate, onExecute, 
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") handleSave()
+    if (e.key === "Enter" && editing) handleSave()
     if (e.key === "Escape") { setText(item.text); setEditing(false) }
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", borderBottom: "1px solid #f0f0f0", gap: 8 }}>
-      <span {...dragHandleProps} style={{ cursor: "grab", color: "#999", userSelect: "none" }} title="Drag to reorder">≡</span>
-      <span style={{ color: "#999", minWidth: 20, textAlign: "right" }}>{index + 1}</span>
-      <span style={{ color: "#aaa", fontSize: 12 }}>[{item.id}]</span>
+    <div className="flex items-center px-3 py-2.5 border-b border-gray-100 gap-2 group">
+      <span {...dragHandleProps} className="cursor-grab text-gray-300 select-none hover:text-gray-500 transition-colors" title="Drag to reorder">≡</span>
+      <span className="text-gray-300 min-w-5 text-right text-xs font-mono">{index + 1}</span>
       {editing ? (
         <textarea
           value={text}
@@ -40,18 +39,18 @@ export default function QueueItem({ item, index, onRemove, onUpdate, onExecute, 
           onKeyDown={handleKeyDown}
           autoFocus
           rows={Math.max(1, text.split("\n").length)}
-          style={{ flex: 1, padding: "4px 8px", border: "1px solid #3b82f6", borderRadius: 4, fontSize: 14, outline: "none", fontFamily: "inherit", resize: "vertical" }}
+          className="flex-1 px-2 py-1 border border-blue-400 rounded text-sm outline-none resize-y"
         />
       ) : (
-        <span style={{ flex: 1, cursor: "text", whiteSpace: "pre-wrap" }} onDoubleClick={() => setEditing(true)} title="더블클릭하여 수정">{item.text}</span>
+        <span className="flex-1 cursor-text whitespace-pre-wrap text-sm text-gray-800 leading-relaxed" onDoubleClick={() => setEditing(true)} title="더블클릭하여 수정">{item.text}</span>
       )}
       {!editing && (
-        <button onClick={() => setEditing(true)} style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 13 }} title="Edit">✎</button>
+        <button onClick={() => setEditing(true)} className="opacity-0 group-hover:opacity-100 bg-transparent border-none cursor-pointer text-gray-300 hover:text-gray-500 text-sm transition-all" title="Edit">✎</button>
       )}
       {onExecute && (
-        <button onClick={() => onExecute(item.id)} style={{ background: "#3b82f6", border: "none", cursor: "pointer", color: "white", fontSize: 12, padding: "4px 10px", borderRadius: 4 }} title="Execute">▶</button>
+        <button onClick={() => onExecute(item.id)} className="bg-transparent border-none cursor-pointer text-gray-300 hover:text-blue-500 hover:bg-blue-50 text-xs px-1.5 py-1 rounded transition-all" title="Execute">▶</button>
       )}
-      <button onClick={() => onRemove(item.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 16 }} title="Remove">✕</button>
+      <button onClick={() => onRemove(item.id)} className="opacity-0 group-hover:opacity-100 bg-transparent border-none cursor-pointer text-gray-300 hover:text-red-400 text-sm transition-all" title="Remove">✕</button>
     </div>
   )
 }

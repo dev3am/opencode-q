@@ -36,8 +36,8 @@ export default function QueueList({ items, onRemove, onUpdate, onReorder, onClea
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-        <button onClick={onClear} style={{ background: "none", border: "1px solid #ddd", cursor: "pointer", padding: "4px 8px", borderRadius: 4, fontSize: 12, color: "#666" }}>Clear all</button>
+      <div className="flex justify-end mb-2">
+        <button onClick={onClear} className="bg-transparent border border-gray-300 cursor-pointer px-2 py-1 rounded text-xs text-gray-500 hover:text-gray-700 hover:border-gray-400 transition-colors">Clear all</button>
       </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>

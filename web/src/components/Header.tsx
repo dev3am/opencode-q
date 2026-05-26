@@ -35,49 +35,34 @@ export default function Header({ sessionId, realSessionId, sessionStatus, status
   const color = STATUS_COLORS[sessionStatus] || STATUS_COLORS.unknown
   const label = STATUS_LABELS[sessionStatus] || sessionStatus
   const isError = sessionStatus === "error"
+  const isBusy = sessionStatus === "busy"
 
   return (
-    <div style={{ marginBottom: 16, padding: "8px 0", borderBottom: "1px solid #e0e0e0" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ margin: 0, fontSize: 18 }}>
-          opencode-q
-        </h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 13, color: "#666", background: "#f0f0f0", padding: "2px 8px", borderRadius: 4 }}>
+    <div className="mb-4 pb-2 border-b border-gray-200">
+      <div className="flex justify-between items-center">
+        <h1 className="m-0 text-lg font-bold text-gray-800">opencode-q</h1>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
             {realSessionId ? shortId(realSessionId) : sessionId}
           </span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, padding: "2px 8px", borderRadius: 4, background: color + "18", color }}>
-            <span style={{
-              width: 7, height: 7, borderRadius: "50%", background: color,
-              animation: sessionStatus === "busy" ? "pulse 1.5s infinite" : "none",
-            }} />
+          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded" style={{ background: color + "18", color }}>
+            <span className={`w-1.5 h-1.5 rounded-full ${isBusy ? "animate-pulse" : ""}`} style={{ background: color }} />
             {label}
           </span>
         </div>
       </div>
 
       {isError && (
-        <div style={{ marginTop: 8, fontSize: 13, color: "#555", paddingLeft: 8, borderLeft: "2px solid #ef4444" }}>
-          <div style={{ color: "#ef4444", marginBottom: 6 }}>
+        <div className="mt-2 pl-2 border-l-2 border-red-500">
+          <div className="text-xs text-red-600 mb-1">
             실행 실패: {statusDetail.message || "unknown error"}
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={onRetry} style={{ padding: "4px 12px", fontSize: 12, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer" }}>
-              재시도
-            </button>
-            <button onClick={onSkip} style={{ padding: "4px 12px", fontSize: 12, background: "#6b7280", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer" }}>
-              건너뛰기
-            </button>
+          <div className="flex gap-2">
+            <button onClick={onRetry} className="px-3 py-1 text-xs font-medium bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors cursor-pointer">재시도</button>
+            <button onClick={onSkip} className="px-3 py-1 text-xs font-medium bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors cursor-pointer">건너뛰기</button>
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-      `}</style>
     </div>
   )
 }

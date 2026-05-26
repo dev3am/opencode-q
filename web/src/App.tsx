@@ -56,11 +56,11 @@ export default function App() {
   const canExecute = (currentProject?.hasSdk || currentProject?.hasCallback) ?? false
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
+    <div className="flex min-h-screen">
       {projects.length > 0 && (
         <ProjectSidebar projects={projects} selectedBaseDir={selectedBaseDir} onSelect={setSelectedBaseDir} />
       )}
-      <div style={{ flex: 1, maxWidth: 600, margin: "0 auto", padding: 16 }}>
+      <div className="flex-1 p-4">
         <Header sessionId={sessionId} realSessionId={realSessionId} sessionStatus={sessionStatus} statusDetail={statusDetail} onRetry={retry} onSkip={skip} />
         {items.length === 0 ? (
           <EmptyState />
