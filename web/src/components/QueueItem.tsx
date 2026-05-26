@@ -28,29 +28,46 @@ export default function QueueItem({ item, index, onRemove, onUpdate, onExecute, 
   }
 
   return (
-    <div className="flex items-center px-3 py-2.5 border-b border-gray-100 gap-2 group">
-      <span {...dragHandleProps} className="cursor-grab text-gray-300 select-none hover:text-gray-500 transition-colors" title="Drag to reorder">≡</span>
-      <span className="text-gray-300 min-w-5 text-right text-xs font-mono">{index + 1}</span>
+    <div className="flex items-start gap-2 group py-1.5">
+      <div className="flex flex-col items-center pt-3 gap-1 min-w-[18px]">
+        <span {...dragHandleProps} className="cursor-grab text-gray-300 select-none hover:text-gray-500 transition-colors text-sm leading-none" title="Drag to reorder">≡</span>
+        <span className="text-gray-300 text-[11px] font-mono">{index + 1}</span>
+      </div>
+
       {editing ? (
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
-          autoFocus
-          rows={Math.max(1, text.split("\n").length)}
-          className="flex-1 px-2 py-1 border border-blue-400 rounded text-sm outline-none resize-y"
-        />
+        <div className="flex-1 flex items-start gap-1">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={handleKeyDown}
+            autoFocus
+            rows={Math.max(1, text.split("\n").length)}
+            className="flex-1 px-4 py-3 border border-blue-400 rounded-2xl text-sm outline-none resize-y bg-white shadow-sm"
+          />
+          <button onClick={() => onRemove(item.id)} className="bg-transparent border-none cursor-pointer text-gray-300 hover:text-red-400 text-xs pt-3 transition-colors" title="Remove">✕</button>
+        </div>
       ) : (
-        <span className="flex-1 cursor-text whitespace-pre-wrap text-sm text-gray-800 leading-relaxed" onDoubleClick={() => setEditing(true)} title="더블클릭하여 수정">{item.text}</span>
+        <div className="flex-1 bg-gray-50 rounded-2xl px-4 py-3 pb-8 pr-7 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed cursor-text border border-transparent hover:border-gray-200 transition-colors relative"
+          onDoubleClick={() => setEditing(true)}
+          title="더블클릭하여 수정"
+        >
+          {item.text}
+          {onExecute && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onExecute(item.id) }}
+              className="absolute top-1/2 -translate-y-1/2 right-2 bg-transparent border-none cursor-pointer text-gray-300 hover:text-blue-500 text-xs transition-colors"
+              title="Execute"
+            >▶</button>
+          )}
+          {!editing && (
+            <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={(e) => { e.stopPropagation(); setEditing(true) }} className="bg-transparent border-none cursor-pointer text-gray-300 hover:text-gray-500 text-xs transition-colors" title="Edit">✎</button>
+              <button onClick={(e) => { e.stopPropagation(); onRemove(item.id) }} className="bg-transparent border-none cursor-pointer text-gray-300 hover:text-red-400 text-xs transition-colors" title="Remove">✕</button>
+            </div>
+          )}
+        </div>
       )}
-      {!editing && (
-        <button onClick={() => setEditing(true)} className="opacity-0 group-hover:opacity-100 bg-transparent border-none cursor-pointer text-gray-300 hover:text-gray-500 text-sm transition-all" title="Edit">✎</button>
-      )}
-      {onExecute && (
-        <button onClick={() => onExecute(item.id)} className="bg-transparent border-none cursor-pointer text-gray-300 hover:text-blue-500 hover:bg-blue-50 text-xs px-1.5 py-1 rounded transition-all" title="Execute">▶</button>
-      )}
-      <button onClick={() => onRemove(item.id)} className="opacity-0 group-hover:opacity-100 bg-transparent border-none cursor-pointer text-gray-300 hover:text-red-400 text-sm transition-all" title="Remove">✕</button>
     </div>
   )
 }

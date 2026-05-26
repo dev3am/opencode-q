@@ -41,9 +41,11 @@ export default function QueueList({ items, onRemove, onUpdate, onReorder, onClea
       </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-          {items.map((item, index) => (
-            <SortableItem key={item.id} item={item} index={index} onRemove={onRemove} onUpdate={onUpdate} onExecute={onExecute} />
-          ))}
+          <div className="flex flex-col gap-1">
+            {items.map((item, index) => (
+              <SortableItem key={item.id} item={item} index={index} onRemove={onRemove} onUpdate={onUpdate} onExecute={onExecute} />
+            ))}
+          </div>
         </SortableContext>
       </DndContext>
     </div>
