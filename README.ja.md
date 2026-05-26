@@ -99,6 +99,20 @@ Web UIはプラグインロード時に自動起動します。
 |-----------|-----------|------|
 | `port` | `4321` | Web UIのHTTPサーバーポート |
 
+## トラブルシューティング
+
+Web UIで白い画面が表示されるなどの問題が発生した場合、ローカルのエラーログを確認できます：
+
+1. CLIコマンドを実行して、最近のエラーログを確認します：
+   ```bash
+   opencode-q logs
+   ```
+2. または、ローカルに保存されているログファイルを直接確認できます：
+   - macOS/Linux: `~/.config/opencode/opencode-q-errors.log`
+   - Windows: `%USERPROFILE%\.config\opencode\opencode-q-errors.log`
+
+エラーを迅速に診断して解決できるよう、[GitHub Issue](https://github.com/dev3am/opencode-q/issues)に該当のログを添付してご報告ください！
+
 ## アーキテクチャ
 
 開発セットアップと詳細なアーキテクチャについては [CONTRIBUTING.md](https://github.com/dev3am/opencode-q/blob/main/CONTRIBUTING.md) を参照してください。

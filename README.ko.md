@@ -99,6 +99,20 @@ Web UI는 플러그인이 로드될 때 자동으로 시작됩니다.
 |------|--------|------|
 | `port` | `4321` | Web UI HTTP 서버 포트 |
 
+## 문제 해결 (Troubleshooting)
+
+Web UI에서 빈 화면이 나타나는 등 문제가 발생하면 로컬 에러 로그를 확인할 수 있습니다:
+
+1. CLI 명령어를 실행하여 최근 에러 로그를 확인합니다:
+   ```bash
+   opencode-q logs
+   ```
+2. 또는 로컬에 저장된 로그 파일을 직접 확인할 수 있습니다:
+   - macOS/Linux: `~/.config/opencode/opencode-q-errors.log`
+   - Windows: `%USERPROFILE%\.config\opencode\opencode-q-errors.log`
+
+에러를 신속히 진단하고 해결할 수 있도록 [GitHub Issue](https://github.com/dev3am/opencode-q/issues)에 해당 로그를 첨부하여 제보해 주세요!
+
 ## 아키텍처
 
 개발 설정 및 상세 아키텍처는 [CONTRIBUTING.md](https://github.com/dev3am/opencode-q/blob/main/CONTRIBUTING.md)를 참조하세요.
