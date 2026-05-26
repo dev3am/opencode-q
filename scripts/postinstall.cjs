@@ -30,7 +30,7 @@ try {
     console.log(`opencode-q: web UI copied to ${webDest}`)
   }
 
-  console.log(`opencode-q: Web UI will start at http://localhost:4321 when OpenCode runs`)
+  console.log(`opencode-q: Web UI will start at http://127.0.0.1:4321 when OpenCode runs`)
 } catch (err) {
   console.warn(`opencode-q: could not install plugin: ${err.message}`)
   console.warn(`opencode-q: manually add to opencode.json: { "plugin": ["opencode-q"] }`)
