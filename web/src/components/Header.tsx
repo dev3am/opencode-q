@@ -1,4 +1,3 @@
-import { useState } from "react"
 import type { StatusDetail } from "../hooks/useSSE"
 
 interface HeaderProps {
@@ -33,7 +32,6 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 export default function Header({ sessionId, realSessionId, sessionStatus, statusDetail, onRetry, onSkip }: HeaderProps) {
-  const [expanded, setExpanded] = useState(false)
   const color = STATUS_COLORS[sessionStatus] || STATUS_COLORS.unknown
   const label = STATUS_LABELS[sessionStatus] || sessionStatus
   const isError = sessionStatus === "error"
@@ -41,8 +39,8 @@ export default function Header({ sessionId, realSessionId, sessionStatus, status
   return (
     <div style={{ marginBottom: 16, padding: "8px 0", borderBottom: "1px solid #e0e0e0" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ margin: 0, fontSize: 18, cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>
-          opencode-q {expanded ? "▾" : "›"}
+        <h1 style={{ margin: 0, fontSize: 18 }}>
+          opencode-q
         </h1>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 13, color: "#666", background: "#f0f0f0", padding: "2px 8px", borderRadius: 4 }}>
@@ -58,13 +56,7 @@ export default function Header({ sessionId, realSessionId, sessionStatus, status
         </div>
       </div>
 
-      {expanded && !isError && statusDetail.prompt && (
-        <div style={{ marginTop: 8, fontSize: 13, color: "#555", paddingLeft: 8, borderLeft: "2px solid #e0e0e0" }}>
-          <div>마지막 실행: "{statusDetail.prompt.length > 50 ? statusDetail.prompt.slice(0, 50) + "..." : statusDetail.prompt}"</div>
-        </div>
-      )}
-
-      {expanded && isError && (
+      {isError && (
         <div style={{ marginTop: 8, fontSize: 13, color: "#555", paddingLeft: 8, borderLeft: "2px solid #ef4444" }}>
           <div style={{ color: "#ef4444", marginBottom: 6 }}>
             실행 실패: {statusDetail.message || "unknown error"}
