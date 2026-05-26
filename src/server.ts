@@ -46,6 +46,7 @@ interface RegistryEntry {
   sessionId: string
   status: string
   realSessionId: string | null
+  callbackUrl?: string
 }
 
 function loadRegistry(): Map<string, ProjectState> {
@@ -58,7 +59,7 @@ function loadRegistry(): Map<string, ProjectState> {
       const sessions = new Map([[entry.sessionId, { status: entry.status as SessionStatus }]])
       const aliasToReal = new Map<string, string>()
       if (entry.realSessionId) aliasToReal.set("default", entry.realSessionId)
-      map.set(entry.baseDir, { baseDir: entry.baseDir, sdkClient: null, sessions, aliasToReal })
+      map.set(entry.baseDir, { baseDir: entry.baseDir, sdkClient: null, callbackUrl: entry.callbackUrl, sessions, aliasToReal })
     }
     return map
   } catch {
@@ -72,7 +73,7 @@ function saveRegistry(projects: Map<string, ProjectState>): void {
   const entries: RegistryEntry[] = []
   for (const p of projects.values()) {
     for (const [sid, s] of p.sessions) {
-      entries.push({ baseDir: p.baseDir, sessionId: sid, status: s.status, realSessionId: p.aliasToReal.get("default") || null })
+      entries.push({ baseDir: p.baseDir, sessionId: sid, status: s.status, realSessionId: p.aliasToReal.get("default") || null, callbackUrl: p.callbackUrl })
     }
   }
   writeFileSync(registryPath(), JSON.stringify({ projects: entries }), "utf-8")
@@ -108,6 +109,7 @@ export function createHandler(config: ServerConfig) {
     const existing = projects.get(reg.baseDir)
     if (existing) {
       existing.sdkClient = reg.sdkClient
+      if (reg.callbackUrl) existing.callbackUrl = reg.callbackUrl
       ensureSession(existing, reg.sessionId)
       existing.aliasToReal.set("default", reg.sessionId)
       serverLog(`project updated: ${reg.baseDir}`)
@@ -115,6 +117,7 @@ export function createHandler(config: ServerConfig) {
       const state: ProjectState = {
         baseDir: reg.baseDir,
         sdkClient: reg.sdkClient,
+        callbackUrl: reg.callbackUrl,
         sessions: new Map([[reg.sessionId, { status: "unknown" as SessionStatus }]]),
         aliasToReal: new Map([["default", reg.sessionId]]),
       }
@@ -175,6 +178,33 @@ export function createHandler(config: ServerConfig) {
     broadcast("session-status", { baseDir, status, sessionId, realSessionId: realId, prompt: detail?.prompt, message: detail?.message })
   }
 
+  function executeViaCallback(project: ProjectState, sid: string, item: any): void {
+    const url = project.callbackUrl
+    if (!url) return
+    const rid = resolveSessionId(project, sid)
+    serverLog(`callback execute: alias=${sid}, real=${rid}, url=${url}`)
+    fetch(`${url}/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: item.text, realSessionId: rid }),
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`callback returned ${r.status}`)
+        return r.json()
+      })
+      .then(() => {
+        broadcast("queue-updated", { baseDir: project.baseDir, sessionId: sid })
+      })
+      .catch((err) => {
+        const baseDir = project.baseDir
+        QM.reinsertAtFront(baseDir, sid, item)
+        const ss = project.sessions.get(sid)
+        if (ss) { ss.failedItem = { item, retryCount: 0 }; ss.status = "error" }
+        broadcast("queue-updated", { baseDir, sessionId: sid })
+        broadcast("session-status", { baseDir, status: "error", sessionId: sid, message: String(err) })
+      })
+  }
+
   function serveStaticRes(webDir: string, urlPath: string, res: http.ServerResponse): boolean {
     let filePath = join(webDir, urlPath === "/" ? "index.html" : urlPath)
     if (!existsSync(filePath)) filePath = join(webDir, "index.html")
@@ -210,7 +240,7 @@ export function createHandler(config: ServerConfig) {
       }
       const list = Array.from(merged.values()).map((p) => {
         const sessions = Array.from(p.sessions.entries()).map(([sid, s]) => ({ sessionId: sid, status: s.status }))
-        return { baseDir: p.baseDir, sessions, hasSdk: !!p.sdkClient }
+        return { baseDir: p.baseDir, sessions, hasSdk: !!p.sdkClient, hasCallback: !!p.callbackUrl }
       })
       jsonResponse(res, { projects: list })
       return
@@ -219,7 +249,7 @@ export function createHandler(config: ServerConfig) {
     if (pathname === "/api/projects/register" && req.method === "POST") {
       const body = JSON.parse(await parseBody(req))
       if (!body.baseDir) { jsonResponse(res, { error: "baseDir is required" }, 400); return }
-      registerProject({ baseDir: body.baseDir, sdkClient: null, sessionId: body.sessionId || "default" })
+      registerProject({ baseDir: body.baseDir, sdkClient: null, sessionId: body.sessionId || "default", callbackUrl: body.callbackUrl })
       broadcast("projects-updated", {})
       jsonResponse(res, { registered: true, baseDir: body.baseDir })
       return
@@ -250,6 +280,52 @@ export function createHandler(config: ServerConfig) {
       }
     }
 
+    m = pathname.match(/^\/api\/projects\/([^/]+)\/session\/([^/]+)\/status$/)
+    if (m && req.method === "PUT") {
+      const [, encodedBaseDir, sid] = m
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { project } = rp
+      const body = JSON.parse(await parseBody(req))
+      setSessionStatus(rp.baseDir, sid, body.status, body)
+      jsonResponse(res, { updated: true })
+      return
+    }
+
+    m = pathname.match(/^\/api\/projects\/([^/]+)\/session\/([^/]+)\/mapping$/)
+    if (m && req.method === "PUT") {
+      const [, encodedBaseDir, sid] = m
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const body = JSON.parse(await parseBody(req))
+      setSessionIdMapping(rp.baseDir, body.alias || sid, body.realId)
+      saveRegistry(projects)
+      jsonResponse(res, { updated: true })
+      return
+    }
+
+    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/execution-result$/)
+    if (m && req.method === "POST") {
+      const [, encodedBaseDir, sid] = m
+      const rp = requireProject(encodedBaseDir)
+      if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
+      const { baseDir, project } = rp
+      const body = JSON.parse(await parseBody(req))
+      if (body.success) {
+        broadcast("queue-updated", { baseDir, sessionId: sid })
+      } else {
+        const sessionState = project.sessions.get(sid)
+        if (sessionState) {
+          sessionState.status = "error"
+          if (body.item) sessionState.failedItem = { item: body.item, retryCount: (sessionState.failedItem?.retryCount ?? 0) + 1 }
+        }
+        broadcast("queue-updated", { baseDir, sessionId: sid })
+        broadcast("session-status", { baseDir, status: "error", sessionId: sid, message: body.error || "Execution failed" })
+      }
+      jsonResponse(res, { received: true })
+      return
+    }
+
     m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/reorder$/)
     if (m && req.method === "PATCH") {
       const [, encodedBaseDir, sid] = m
@@ -276,18 +352,23 @@ export function createHandler(config: ServerConfig) {
       if (idx === -1) { jsonResponse(res, { error: "Item not found" }, 404); return }
       const [item] = data.items.splice(idx, 1)
       Storage.save(baseDir, sid, data)
-      if (!project.sdkClient) { data.items.unshift(item); Storage.save(baseDir, sid, data); jsonResponse(res, { error: "SDK not available" }, 503); return }
-      const rid = resolveSessionId(project, sid)
-      serverLog(`execute: alias=${sid}, real=${rid}, text="${item.text.slice(0, 50)}"`)
-      project.sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: item.text }] } })
-        .then(() => { broadcast("queue-updated", { baseDir, sessionId: sid }) })
-        .catch((err: any) => {
-          const current = Storage.load(baseDir, sid); current.items.unshift(item); Storage.save(baseDir, sid, current)
-          const ss = project.sessions.get(sid)
-          if (ss) { ss.failedItem = { item, retryCount: 0 }; ss.status = "error" }
-          broadcast("queue-updated", { baseDir, sessionId: sid })
-          broadcast("session-status", { baseDir, status: "error", sessionId: sid, message: String(err) })
-        })
+      if (project.sdkClient) {
+        const rid = resolveSessionId(project, sid)
+        serverLog(`execute: alias=${sid}, real=${rid}, text="${item.text.slice(0, 50)}"`)
+        project.sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: item.text }] } })
+          .then(() => { broadcast("queue-updated", { baseDir, sessionId: sid }) })
+          .catch((err: any) => {
+            const current = Storage.load(baseDir, sid); current.items.unshift(item); Storage.save(baseDir, sid, current)
+            const ss = project.sessions.get(sid)
+            if (ss) { ss.failedItem = { item, retryCount: 0 }; ss.status = "error" }
+            broadcast("queue-updated", { baseDir, sessionId: sid })
+            broadcast("session-status", { baseDir, status: "error", sessionId: sid, message: String(err) })
+          })
+      } else if (project.callbackUrl) {
+        executeViaCallback(project, sid, item)
+      } else {
+        data.items.unshift(item); Storage.save(baseDir, sid, data); jsonResponse(res, { error: "SDK not available" }, 503); return
+      }
       broadcast("queue-updated", { baseDir, sessionId: sid })
       jsonResponse(res, { executed: true, item })
       return
@@ -301,18 +382,23 @@ export function createHandler(config: ServerConfig) {
       const { baseDir, project } = rp
       const item = QM.dequeue(baseDir, sid)
       if (!item) { jsonResponse(res, { executed: false }); return }
-      if (!project.sdkClient) { QM.reinsertAtFront(baseDir, sid, item); jsonResponse(res, { error: "SDK not available" }, 503); return }
-      const rid = resolveSessionId(project, sid)
-      serverLog(`next: alias=${sid}, real=${rid}`)
-      project.sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: item.text }] } })
-        .then(() => { broadcast("queue-updated", { baseDir, sessionId: sid }) })
-        .catch((err: any) => {
-          QM.reinsertAtFront(baseDir, sid, item)
-          const ss = project.sessions.get(sid)
-          if (ss) { ss.failedItem = { item, retryCount: 0 }; ss.status = "error" }
-          broadcast("queue-updated", { baseDir, sessionId: sid })
-          broadcast("session-status", { baseDir, status: "error", sessionId: sid, message: String(err) })
-        })
+      if (project.sdkClient) {
+        const rid = resolveSessionId(project, sid)
+        serverLog(`next: alias=${sid}, real=${rid}`)
+        project.sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: item.text }] } })
+          .then(() => { broadcast("queue-updated", { baseDir, sessionId: sid }) })
+          .catch((err: any) => {
+            QM.reinsertAtFront(baseDir, sid, item)
+            const ss = project.sessions.get(sid)
+            if (ss) { ss.failedItem = { item, retryCount: 0 }; ss.status = "error" }
+            broadcast("queue-updated", { baseDir, sessionId: sid })
+            broadcast("session-status", { baseDir, status: "error", sessionId: sid, message: String(err) })
+          })
+      } else if (project.callbackUrl) {
+        executeViaCallback(project, sid, item)
+      } else {
+        QM.reinsertAtFront(baseDir, sid, item); jsonResponse(res, { error: "SDK not available" }, 503); return
+      }
       broadcast("queue-updated", { baseDir, sessionId: sid })
       jsonResponse(res, { executed: true, item })
       return
@@ -328,19 +414,24 @@ export function createHandler(config: ServerConfig) {
       const failed = sessionState?.failedItem
       if (!failed) { jsonResponse(res, { error: "No failed item" }, 404); return }
       if (failed.retryCount >= 3) { jsonResponse(res, { error: "Max retries exceeded", item: failed.item }, 429); return }
-      if (!project.sdkClient) { jsonResponse(res, { error: "SDK not available" }, 503); return }
-      const rid2 = resolveSessionId(project, sid)
       const failedItem = { ...failed.item }
-      project.sdkClient.prompt({ path: { id: rid2 }, body: { parts: [{ type: "text", text: failed.item.text }] } })
-        .then(() => {
-          const ss = project.sessions.get(sid)
-          if (ss) { ss.failedItem = undefined; ss.status = "idle" }
-          broadcast("queue-updated", { baseDir, sessionId: sid })
-        })
-        .catch(() => {
-          const ss = project.sessions.get(sid)
-          if (ss?.failedItem) ss.failedItem.retryCount++
-        })
+      if (project.sdkClient) {
+        const rid2 = resolveSessionId(project, sid)
+        project.sdkClient.prompt({ path: { id: rid2 }, body: { parts: [{ type: "text", text: failed.item.text }] } })
+          .then(() => {
+            const ss = project.sessions.get(sid)
+            if (ss) { ss.failedItem = undefined; ss.status = "idle" }
+            broadcast("queue-updated", { baseDir, sessionId: sid })
+          })
+          .catch(() => {
+            const ss = project.sessions.get(sid)
+            if (ss?.failedItem) ss.failedItem.retryCount++
+          })
+      } else if (project.callbackUrl) {
+        executeViaCallback(project, sid, failed.item)
+      } else {
+        jsonResponse(res, { error: "SDK not available" }, 503); return
+      }
       if (sessionState) sessionState.failedItem = undefined
       broadcast("queue-updated", { baseDir, sessionId: sid })
       jsonResponse(res, { executed: true, item: failedItem })
@@ -481,17 +572,30 @@ function createRemoteClient(port: number) {
     registerProject: (reg: ProjectRegistration) => {
       const merged = loadRegistry()
       if (!merged.has(reg.baseDir)) {
-        merged.set(reg.baseDir, { baseDir: reg.baseDir, sdkClient: reg.sdkClient, sessions: new Map([[reg.sessionId, { status: "unknown" as SessionStatus }]]), aliasToReal: new Map([["default", reg.sessionId]]) })
+        merged.set(reg.baseDir, { baseDir: reg.baseDir, sdkClient: reg.sdkClient, callbackUrl: reg.callbackUrl, sessions: new Map([[reg.sessionId, { status: "unknown" as SessionStatus }]]), aliasToReal: new Map([["default", reg.sessionId]]) })
+      } else {
+        const existing = merged.get(reg.baseDir)!
+        if (reg.callbackUrl) existing.callbackUrl = reg.callbackUrl
       }
       saveRegistry(merged)
-      fetch(`${origin}/api/projects/register`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ baseDir: reg.baseDir, sessionId: reg.sessionId }) }).catch(() => {})
+      fetch(`${origin}/api/projects/register`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ baseDir: reg.baseDir, sessionId: reg.sessionId, callbackUrl: reg.callbackUrl }) }).catch(() => {})
     },
     unregisterProject: (baseDir: string) => {
       fetch(`${origin}/api/projects/${encodeURIComponent(baseDir)}`, { method: "DELETE" }).catch(() => {})
     },
     getProjectState: (_baseDir: string) => undefined as ProjectState | undefined,
-    setSessionStatus: (_baseDir: string, _sid: string, _status: any, _detail?: any) => {},
-    setSessionIdMapping: (_baseDir: string, _alias: string, _realId: string) => {},
+    setSessionStatus: (baseDir: string, sid: string, status: any, detail?: any) => {
+      fetch(`${origin}/api/projects/${encodeURIComponent(baseDir)}/session/${sid}/status`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, prompt: detail?.prompt, message: detail?.message }),
+      }).catch(() => {})
+    },
+    setSessionIdMapping: (baseDir: string, alias: string, realId: string) => {
+      fetch(`${origin}/api/projects/${encodeURIComponent(baseDir)}/session/${alias}/mapping`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alias, realId }),
+      }).catch(() => {})
+    },
   }
 }
 

@@ -1,5 +1,6 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import { tool } from "@opencode-ai/plugin"
+import * as http from "node:http"
 import * as QM from "./queue-manager"
 import { startServer } from "./server"
 import { PREVIEW_LENGTH, DEFAULT_PORT, STORAGE_DIR } from "./constants"
@@ -54,6 +55,56 @@ function ensureCommands(baseDir: string): void {
   }
 }
 
+function startCallbackServer(client: any, mainPort: number, baseDir: string): Promise<{ port: number; url: string }> {
+  return new Promise((resolve, reject) => {
+    const server = http.createServer(async (req, res) => {
+      if (req.url === "/health" && req.method === "GET") {
+        res.writeHead(200, { "Content-Type": "application/json" })
+        res.end(JSON.stringify({ ok: true }))
+        return
+      }
+      if (req.url === "/execute" && req.method === "POST") {
+        const chunks: Buffer[] = []
+        req.on("data", (c: Buffer) => chunks.push(c))
+        req.on("end", async () => {
+          try {
+            const { text, realSessionId } = JSON.parse(Buffer.concat(chunks).toString())
+            res.writeHead(202, { "Content-Type": "application/json" })
+            res.end(JSON.stringify({ accepted: true }))
+            client.session.prompt({ path: { id: realSessionId }, body: { parts: [{ type: "text", text }] } })
+              .then(async () => {
+                await fetch(`http://localhost:${mainPort}/api/projects/${encodeURIComponent(baseDir)}/queue/default/execution-result`, {
+                  method: "POST", headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ success: true }),
+                })
+              })
+              .catch(async (err: any) => {
+                await fetch(`http://localhost:${mainPort}/api/projects/${encodeURIComponent(baseDir)}/queue/default/execution-result`, {
+                  method: "POST", headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ success: false, error: String(err), item: { text } }),
+                })
+              })
+          } catch {
+            if (!res.headersSent) {
+              res.writeHead(400, { "Content-Type": "application/json" })
+              res.end(JSON.stringify({ error: "Invalid request" }))
+            }
+          }
+        })
+        return
+      }
+      res.writeHead(404, { "Content-Type": "application/json" })
+      res.end(JSON.stringify({ error: "Not found" }))
+    })
+    server.listen(0, () => {
+      const addr = server.address()
+      const port = typeof addr === "object" && addr ? addr.port : 0
+      resolve({ port, url: `http://localhost:${port}` })
+    })
+    server.on("error", reject)
+  })
+}
+
 export default (async ({ client, directory, options }: any) => {
   const baseDir = directory
   ensureCommands(baseDir)
@@ -62,7 +113,9 @@ export default (async ({ client, directory, options }: any) => {
   const desiredPort = options?.port ?? DEFAULT_PORT
   const { broadcast, setSessionIdMapping, setSessionStatus, registerProject, port: actualPort } = await startServer({ webDir, port: desiredPort })
 
-  registerProject({ baseDir, sdkClient: client.session, sessionId: "default" })
+  const callback = await startCallbackServer(client, actualPort, baseDir)
+
+  registerProject({ baseDir, sdkClient: client.session, sessionId: "default", callbackUrl: callback.url })
 
   if (actualPort !== desiredPort) {
     client.tui.showToast({
