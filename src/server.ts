@@ -472,16 +472,28 @@ export function createHandler(config: ServerConfig) {
     }
 
     m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/([^/]+)$/)
-    if (m && req.method === "DELETE") {
+    if (m) {
       const [, encodedBaseDir, sid, id] = m
       const rp = requireProject(encodedBaseDir)
       if (!rp) { jsonResponse(res, { error: "Project not registered" }, 404); return }
       const { baseDir } = rp
-      const removed = QM.remove(baseDir, sid, id)
-      if (!removed) { jsonResponse(res, { error: "Item not found" }, 404); return }
-      broadcast("queue-updated", { baseDir, sessionId: sid })
-      jsonResponse(res, { removed: true })
-      return
+      if (req.method === "DELETE") {
+        const removed = QM.remove(baseDir, sid, id)
+        if (!removed) { jsonResponse(res, { error: "Item not found" }, 404); return }
+        broadcast("queue-updated", { baseDir, sessionId: sid })
+        jsonResponse(res, { removed: true })
+        return
+      }
+      if (req.method === "PATCH") {
+        const body = JSON.parse(await parseBody(req))
+        try {
+          const item = QM.update(baseDir, sid, id, body.text)
+          if (!item) { jsonResponse(res, { error: "Item not found" }, 404); return }
+          broadcast("queue-updated", { baseDir, sessionId: sid })
+          jsonResponse(res, { item })
+        } catch (e: any) { jsonResponse(res, { error: e.message }, 400) }
+        return
+      }
     }
 
     m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)$/)

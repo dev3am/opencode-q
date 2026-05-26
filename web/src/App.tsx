@@ -51,7 +51,7 @@ export default function App() {
     return () => es.close()
   }, [refreshProjects])
 
-  const { items, add, remove, clear, reorder, executeById, retry, skip, sessionStatus, realSessionId, statusDetail } = useQueue(selectedBaseDir, sessionId)
+  const { items, add, remove, update, clear, reorder, executeById, retry, skip, sessionStatus, realSessionId, statusDetail } = useQueue(selectedBaseDir, sessionId)
   const currentProject = projects.find((p) => p.baseDir === selectedBaseDir)
   const canExecute = (currentProject?.hasSdk || currentProject?.hasCallback) ?? false
 
@@ -65,7 +65,7 @@ export default function App() {
         {items.length === 0 ? (
           <EmptyState />
         ) : (
-          <QueueList items={items} onRemove={remove} onReorder={reorder} onClear={clear} onExecute={canExecute ? executeById : undefined} />
+          <QueueList items={items} onRemove={remove} onUpdate={update} onReorder={reorder} onClear={clear} onExecute={canExecute ? executeById : undefined} />
         )}
         <AddPrompt onAdd={add} />
       </div>

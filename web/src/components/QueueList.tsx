@@ -7,22 +7,23 @@ import QueueItemComponent from "./QueueItem"
 interface QueueListProps {
   items: QueueItemType[]
   onRemove: (id: string) => void
+  onUpdate: (id: string, text: string) => void
   onReorder: (from: number, to: number) => void
   onClear: () => void
   onExecute?: (id: string) => void
 }
 
-function SortableItem({ item, index, onRemove, onExecute }: { item: QueueItemType; index: number; onRemove: (id: string) => void; onExecute?: (id: string) => void }) {
+function SortableItem({ item, index, onRemove, onUpdate, onExecute }: { item: QueueItemType; index: number; onRemove: (id: string) => void; onUpdate: (id: string, text: string) => void; onExecute?: (id: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id })
   const style = { transform: CSS.Transform.toString(transform), transition }
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
-      <QueueItemComponent item={item} index={index} onRemove={onRemove} onExecute={onExecute} dragHandleProps={listeners} />
+      <QueueItemComponent item={item} index={index} onRemove={onRemove} onUpdate={onUpdate} onExecute={onExecute} dragHandleProps={listeners} />
     </div>
   )
 }
 
-export default function QueueList({ items, onRemove, onReorder, onClear, onExecute }: QueueListProps) {
+export default function QueueList({ items, onRemove, onUpdate, onReorder, onClear, onExecute }: QueueListProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   function handleDragEnd(event: any) {
@@ -41,7 +42,7 @@ export default function QueueList({ items, onRemove, onReorder, onClear, onExecu
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
           {items.map((item, index) => (
-            <SortableItem key={item.id} item={item} index={index} onRemove={onRemove} onExecute={onExecute} />
+            <SortableItem key={item.id} item={item} index={index} onRemove={onRemove} onUpdate={onUpdate} onExecute={onExecute} />
           ))}
         </SortableContext>
       </DndContext>
