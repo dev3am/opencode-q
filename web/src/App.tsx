@@ -57,7 +57,7 @@ export default function App() {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
-      {projects.length > 1 && (
+      {projects.length > 0 && (
         <ProjectSidebar projects={projects} selectedBaseDir={selectedBaseDir} onSelect={setSelectedBaseDir} />
       )}
       <div style={{ flex: 1, maxWidth: 600, margin: "0 auto", padding: 16 }}>
