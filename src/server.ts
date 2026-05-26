@@ -99,6 +99,24 @@ export function createHandler(config: ServerConfig) {
   const sseClients: http.ServerResponse[] = []
   const projects = loadRegistry()
 
+  function healthCheckCallbacks() {
+    for (const [baseDir, project] of projects) {
+      if (!project.callbackUrl) continue
+      fetch(`${project.callbackUrl}/health`, { signal: AbortSignal.timeout(3000) })
+        .then((r) => { if (!r.ok) throw new Error(`${r.status}`) })
+        .catch(() => {
+          serverLog(`health check failed: ${baseDir} (${project.callbackUrl})`)
+          project.callbackUrl = undefined
+          project.sdkClient = null
+          for (const [, s] of project.sessions) { s.status = "unknown" }
+          saveRegistry(projects)
+          broadcast("projects-updated", {})
+        })
+    }
+  }
+
+  const healthCheckInterval = setInterval(healthCheckCallbacks, 15000)
+
   function ensureSession(project: ProjectState, sessionId: string, status: SessionStatus = "unknown") {
     const s = project.sessions.get(sessionId)
     if (s) s.status = status
@@ -527,6 +545,7 @@ export function createHandler(config: ServerConfig) {
     getProjectState,
     setSessionStatus,
     setSessionIdMapping,
+    healthCheckInterval,
   }
 }
 
@@ -601,7 +620,7 @@ function createRemoteClient(port: number) {
 
 export async function startServer(config: ServerConfig & { port: number }) {
   const { port, ...handlerConfig } = config
-  const { handler, broadcast, registerProject, unregisterProject, getProjectState, setSessionStatus, setSessionIdMapping } = createHandler(handlerConfig)
+  const { handler, broadcast, registerProject, unregisterProject, getProjectState, setSessionStatus, setSessionIdMapping, healthCheckInterval } = createHandler(handlerConfig)
 
   if (serverSingleton) {
     serverLog(`Server already running, reusing`)
