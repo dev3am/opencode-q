@@ -100,7 +100,32 @@ export function createHandler(config: ServerConfig) {
   const sseClients: http.ServerResponse[] = []
   const projects = loadRegistry()
 
+  function syncWithRegistry() {
+    const registry = loadRegistry()
+    for (const [baseDir, regState] of registry) {
+      const memState = projects.get(baseDir)
+      if (memState) {
+        if (regState.callbackUrl && regState.callbackUrl !== memState.callbackUrl) {
+          memState.callbackUrl = regState.callbackUrl
+        }
+        for (const [sid, s] of regState.sessions) {
+          const memSession = memState.sessions.get(sid)
+          if (memSession) {
+            if (s.status !== "unknown" && memSession.status === "unknown") {
+              memSession.status = s.status
+            }
+          } else {
+            memState.sessions.set(sid, s)
+          }
+        }
+      } else {
+        projects.set(baseDir, regState)
+      }
+    }
+  }
+
   function healthCheckCallbacks() {
+    syncWithRegistry()
     for (const [baseDir, project] of projects) {
       if (!project.callbackUrl) continue
       fetch(`${project.callbackUrl}/health`, { signal: AbortSignal.timeout(3000) })
@@ -168,6 +193,7 @@ export function createHandler(config: ServerConfig) {
 
   function requireProject(encodedBaseDir: string): { baseDir: string; project: ProjectState } | null {
     let baseDir = decodeURIComponent(encodedBaseDir)
+    syncWithRegistry()
     let project = getProjectState(baseDir)
     if (!project && !baseDir.startsWith("/")) {
       project = getProjectState("/" + baseDir)
@@ -272,12 +298,8 @@ export function createHandler(config: ServerConfig) {
     let m: RegExpMatchArray | null
 
     if (pathname === "/api/projects" && req.method === "GET") {
-      const merged = new Map(projects)
-      const registry = loadRegistry()
-      for (const [baseDir, state] of registry) {
-        if (!merged.has(baseDir)) merged.set(baseDir, state)
-      }
-      const list = Array.from(merged.values()).map((p) => {
+      syncWithRegistry()
+      const list = Array.from(projects.values()).map((p) => {
         const sessions = Array.from(p.sessions.entries()).map(([sid, s]) => ({ sessionId: sid, status: s.status }))
         return { baseDir: p.baseDir, sessions, hasSdk: !!p.sdkClient, hasCallback: !!p.callbackUrl }
       })
