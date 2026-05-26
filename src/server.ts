@@ -1,4 +1,5 @@
 import * as http from "node:http"
+import * as net from "node:net"
 import * as QM from "./queue-manager"
 import * as Storage from "./storage"
 import { SSE_HEARTBEAT_MS } from "./constants"
@@ -616,7 +617,30 @@ export function resetServerSingleton() {
   serverSingleton = null
 }
 
-function tryListenPort(server: http.Server, port: number): Promise<number | null> {
+function isPortInUse(port: number, host = "127.0.0.1"): Promise<boolean> {
+  return new Promise((resolve) => {
+    const client = new net.Socket()
+    client.once("connect", () => {
+      client.destroy()
+      resolve(true)
+    })
+    client.once("error", () => {
+      client.destroy()
+      resolve(false)
+    })
+    client.connect(port, host)
+  })
+}
+
+async function tryListenPort(server: http.Server, port: number): Promise<number | null> {
+  // Bun polyfill for node:http can crash asynchronously (uncaught exception) if the port is in use.
+  // Check port availability using a TCP connection beforehand to avoid the crash.
+  const inUse = await isPortInUse(port, "127.0.0.1")
+  if (inUse) {
+    serverLog(`Port ${port} in use (detected by TCP), will use remote server`)
+    return null
+  }
+
   return new Promise((resolve) => {
     server.on("error", (err: any) => {
       if (err.code === "EADDRINUSE") {
