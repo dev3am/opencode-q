@@ -70,6 +70,7 @@ Usage:
   opencode-q next [-p <path>] [-s <id>]            Execute next (dequeue)
   opencode-q sessions [-p <path>]                  List sessions
   opencode-q projects                              List active projects
+  opencode-q logs                                  Show error logs
   opencode-q help                                  Show this help
 
 Options:
@@ -106,6 +107,39 @@ async function main() {
         const name = p.baseDir.split("/").pop() || p.baseDir
         const sessions = p.sessions.map((s: any) => `${s.sessionId} (${s.status})`).join(", ")
         console.log(`  ${name} — ${p.baseDir} [${sessions}]`)
+      }
+      return
+    }
+
+    case "logs": {
+      const { homedir } = await import("node:os")
+      const { join } = await import("node:path")
+      const { existsSync, readFileSync } = await import("node:fs")
+      const logFile = join(homedir(), ".config", "opencode", "opencode-q-errors.log")
+      if (!existsSync(logFile)) {
+        console.log("No error logs found.")
+        return
+      }
+      const raw = readFileSync(logFile, "utf-8").trim()
+      if (!raw) {
+        console.log("No error logs found.")
+        return
+      }
+      const logs = raw.split("\n")
+      console.log(`--- Error Logs (${logs.length} entries) ---`)
+      for (const line of logs) {
+        if (!line) continue
+        try {
+          const entry = JSON.parse(line)
+          console.log(`[${entry.timestamp}] Project: ${entry.project || "none"}`)
+          console.log(`Message: ${entry.message}`)
+          if (entry.stack) {
+            console.log(`Stack:\n${entry.stack.split("\n").slice(0, 5).join("\n")}`)
+          }
+          console.log("-".repeat(40))
+        } catch {
+          console.log(line)
+        }
       }
       return
     }

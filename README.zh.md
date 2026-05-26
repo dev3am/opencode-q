@@ -99,6 +99,20 @@ Web UI 在插件加载时自动启动。
 |------|--------|------|
 | `port` | `4321` | Web UI 的 HTTP 服务器端口 |
 
+## 问题排查 (Troubleshooting)
+
+如果您遇到任何问题（例如 Web UI 出现白屏），可以检查本地错误日志：
+
+1. 运行以下 CLI 命令查看最近的错误日志：
+   ```bash
+   opencode-q logs
+   ```
+2. 或者，您可以直接查看本地存储的日志文件：
+   - macOS/Linux: `~/.config/opencode/opencode-q-errors.log`
+   - Windows: `%USERPROFILE%\.config\opencode\opencode-q-errors.log`
+
+请开一个 [GitHub Issue](https://github.com/dev3am/opencode-q/issues) 并附上这些日志，以帮助我们诊断并解决问题！
+
 ## 架构
 
 开发设置和详细架构请参阅 [CONTRIBUTING.md](https://github.com/dev3am/opencode-q/blob/main/CONTRIBUTING.md)。

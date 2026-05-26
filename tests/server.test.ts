@@ -331,10 +331,12 @@ describe("Multi-Project Registry", () => {
   test("DELETE /api/projects/:baseDir unregisters", async () => {
     const { port: p } = await boot()
     await request(p, "POST", "/api/projects/register", { baseDir: testDir1 })
+    await request(p, "POST", "/api/projects/register", { baseDir: testDir2 })
     const del = await request(p, "DELETE", `/api/projects/${encodeURIComponent(testDir1)}`)
     expect(del.status).toBe(200)
     const res = await request(p, "GET", "/api/projects")
-    expect(res.json.projects).toHaveLength(0)
+    expect(res.json.projects).toHaveLength(1)
+    expect(res.json.projects[0].baseDir).toBe(testDir2)
   })
 
   test("multiple projects can be registered", async () => {

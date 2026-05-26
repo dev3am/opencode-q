@@ -46,6 +46,12 @@ export default function App() {
   useEffect(() => { refreshProjects() }, [refreshProjects])
 
   useEffect(() => {
+    if (selectedBaseDir) {
+      localStorage.setItem("opencode-q-last-project", selectedBaseDir)
+    }
+  }, [selectedBaseDir])
+
+  useEffect(() => {
     const es = createSSE()
     es.addEventListener("projects-updated", () => { refreshProjects() })
     es.addEventListener("session-status", ((e: MessageEvent) => {

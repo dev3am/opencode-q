@@ -281,32 +281,25 @@ export function createHandler(config: ServerConfig) {
       return
     }
 
-    m = pathname.match(/^\/api\/projects\/([^/]+)$/)
-    if (m) {
-      const [, encodedBaseDir] = m
-      const baseDir = decodeURIComponent(encodedBaseDir)
-      if (req.method === "GET") {
-        const project = getProjectState(baseDir)
-        if (!project) { jsonResponse(res, { error: "Project not found" }, 404); return }
-        const sessions = Array.from(project.sessions.entries()).map(([sid, s]) => ({ sessionId: sid, status: s.status }))
-        jsonResponse(res, { baseDir: project.baseDir, sessions })
-        return
+    if (pathname === "/api/logs" && req.method === "POST") {
+      try {
+        const body = JSON.parse(await parseBody(req))
+        const logDir = dirname(registryPath())
+        if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true })
+        const logFile = join(logDir, "opencode-q-errors.log")
+        const logLine = JSON.stringify(body) + "\n"
+        appendFileSync(logFile, logLine, "utf-8")
+        console.error(`[CLIENT ERROR] ${body.timestamp} - Project: ${body.project || "none"}`)
+        console.error(`Message: ${body.message}`)
+        if (body.stack) console.error(`Stack: ${body.stack}`)
+        jsonResponse(res, { received: true })
+      } catch (err: any) {
+        jsonResponse(res, { error: err.message }, 400)
       }
-      if (req.method === "DELETE") {
-        const removed = unregisterProject(baseDir)
-        if (!removed) { jsonResponse(res, { error: "Project not found" }, 404); return }
-        broadcast("projects-updated", {})
-        if (projects.size === 0 && serverSingleton) {
-          serverLog("last project unregistered, shutting down server")
-          serverSingleton.server.close()
-          serverSingleton = null
-        }
-        jsonResponse(res, { unregistered: true })
-        return
-      }
+      return
     }
 
-    m = pathname.match(/^\/api\/projects\/([^/]+)\/session\/([^/]+)\/status$/)
+    m = pathname.match(/^\/api\/projects\/(.+)\/session\/([^/]+)\/status$/)
     if (m && req.method === "PUT") {
       const [, encodedBaseDir, sid] = m
       const rp = requireProject(encodedBaseDir)
@@ -318,7 +311,7 @@ export function createHandler(config: ServerConfig) {
       return
     }
 
-    m = pathname.match(/^\/api\/projects\/([^/]+)\/session\/([^/]+)\/mapping$/)
+    m = pathname.match(/^\/api\/projects\/(.+)\/session\/([^/]+)\/mapping$/)
     if (m && req.method === "PUT") {
       const [, encodedBaseDir, sid] = m
       const rp = requireProject(encodedBaseDir)
@@ -330,7 +323,7 @@ export function createHandler(config: ServerConfig) {
       return
     }
 
-    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/execution-result$/)
+    m = pathname.match(/^\/api\/projects\/(.+)\/queue\/([^/]+)\/execution-result$/)
     if (m && req.method === "POST") {
       const [, encodedBaseDir, sid] = m
       const rp = requireProject(encodedBaseDir)
@@ -352,7 +345,7 @@ export function createHandler(config: ServerConfig) {
       return
     }
 
-    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/reorder$/)
+    m = pathname.match(/^\/api\/projects\/(.+)\/queue\/([^/]+)\/reorder$/)
     if (m && req.method === "PATCH") {
       const [, encodedBaseDir, sid] = m
       const rp = requireProject(encodedBaseDir)
@@ -367,7 +360,7 @@ export function createHandler(config: ServerConfig) {
       return
     }
 
-    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/execute\/([^/]+)$/)
+    m = pathname.match(/^\/api\/projects\/(.+)\/queue\/([^/]+)\/execute\/([^/]+)$/)
     if (m && req.method === "POST") {
       const [, encodedBaseDir, sid, id] = m
       const rp = requireProject(encodedBaseDir)
@@ -401,7 +394,7 @@ export function createHandler(config: ServerConfig) {
       return
     }
 
-    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/next$/)
+    m = pathname.match(/^\/api\/projects\/(.+)\/queue\/([^/]+)\/next$/)
     if (m && req.method === "POST") {
       const [, encodedBaseDir, sid] = m
       const rp = requireProject(encodedBaseDir)
@@ -432,7 +425,7 @@ export function createHandler(config: ServerConfig) {
       return
     }
 
-    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/retry$/)
+    m = pathname.match(/^\/api\/projects\/(.+)\/queue\/([^/]+)\/retry$/)
     if (m && req.method === "POST") {
       const [, encodedBaseDir, sid] = m
       const rp = requireProject(encodedBaseDir)
@@ -467,7 +460,7 @@ export function createHandler(config: ServerConfig) {
       return
     }
 
-    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/skip$/)
+    m = pathname.match(/^\/api\/projects\/(.+)\/queue\/([^/]+)\/skip$/)
     if (m && req.method === "POST") {
       const [, encodedBaseDir, sid] = m
       const rp = requireProject(encodedBaseDir)
@@ -482,7 +475,7 @@ export function createHandler(config: ServerConfig) {
       return
     }
 
-    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)\/([^/]+)$/)
+    m = pathname.match(/^\/api\/projects\/(.+)\/queue\/([^/]+)\/([^/]+)$/)
     if (m) {
       const [, encodedBaseDir, sid, id] = m
       const rp = requireProject(encodedBaseDir)
@@ -507,7 +500,7 @@ export function createHandler(config: ServerConfig) {
       }
     }
 
-    m = pathname.match(/^\/api\/projects\/([^/]+)\/queue\/([^/]+)$/)
+    m = pathname.match(/^\/api\/projects\/(.+)\/queue\/([^/]+)$/)
     if (m) {
       const [, encodedBaseDir, sid] = m
       const rp = requireProject(encodedBaseDir)
@@ -536,7 +529,7 @@ export function createHandler(config: ServerConfig) {
       }
     }
 
-    m = pathname.match(/^\/api\/projects\/([^/]+)\/session\/([^/]+)$/)
+    m = pathname.match(/^\/api\/projects\/(.+)\/session\/([^/]+)$/)
     if (m && req.method === "GET") {
       const [, encodedBaseDir, sid] = m
       const rp = requireProject(encodedBaseDir)
@@ -546,6 +539,31 @@ export function createHandler(config: ServerConfig) {
       const failed = sessionState?.failedItem
       jsonResponse(res, { status: sessionState?.status || "unknown", failedItem: failed?.item ?? null, retryCount: failed?.retryCount ?? 0 })
       return
+    }
+
+    m = pathname.match(/^\/api\/projects\/(.+)$/)
+    if (m) {
+      const [, encodedBaseDir] = m
+      const baseDir = decodeURIComponent(encodedBaseDir)
+      if (req.method === "GET") {
+        const project = getProjectState(baseDir)
+        if (!project) { jsonResponse(res, { error: "Project not found" }, 404); return }
+        const sessions = Array.from(project.sessions.entries()).map(([sid, s]) => ({ sessionId: sid, status: s.status }))
+        jsonResponse(res, { baseDir: project.baseDir, sessions })
+        return
+      }
+      if (req.method === "DELETE") {
+        const removed = unregisterProject(baseDir)
+        if (!removed) { jsonResponse(res, { error: "Project not found" }, 404); return }
+        broadcast("projects-updated", {})
+        if (projects.size === 0 && serverSingleton) {
+          serverLog("last project unregistered, shutting down server")
+          serverSingleton.server.close()
+          serverSingleton = null
+        }
+        jsonResponse(res, { unregistered: true })
+        return
+      }
     }
 
     if (pathname === "/api/broadcast" && req.method === "POST") {

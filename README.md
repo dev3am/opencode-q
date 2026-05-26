@@ -103,6 +103,20 @@ The Web UI starts automatically when the plugin loads.
 |--------|---------|-------------|
 | `port` | `4321` | HTTP server port for the Web UI |
 
+## Troubleshooting
+
+If you encounter any issues (such as a blank screen in the Web UI), you can check the local error logs:
+
+1. Run the following CLI command to view recent errors:
+   ```bash
+   opencode-q logs
+   ```
+2. Alternatively, you can find the raw log file at:
+   - macOS/Linux: `~/.config/opencode/opencode-q-errors.log`
+   - Windows: `%USERPROFILE%\.config\opencode\opencode-q-errors.log`
+
+Please open a [GitHub Issue](https://github.com/dev3am/opencode-q/issues) and attach these logs to help us debug and fix the problem!
+
 ## Architecture
 
 For development setup and detailed architecture, see [CONTRIBUTING.md](https://github.com/dev3am/opencode-q/blob/main/CONTRIBUTING.md).

@@ -97,3 +97,46 @@ export async function fetchSessionStatus(baseDir: string, sessionId: string): Pr
   const res = await fetch(projectPath(baseDir, `/session/${sessionId}`))
   return parseJson(res)
 }
+
+export interface ErrorLogPayload {
+  message: string
+  stack?: string
+  url: string
+  project: string
+  timestamp: string
+  userAgent: string
+}
+
+export async function postError(payload: ErrorLogPayload): Promise<void> {
+  await fetch(`${API_BASE}/logs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).catch(() => {})
+}
+
+export function initGlobalErrorLogging() {
+  window.addEventListener("error", (event) => {
+    const project = localStorage.getItem("opencode-q-last-project") || ""
+    postError({
+      message: event.message || (event.error && event.error.message) || "Uncaught error",
+      stack: (event.error && event.error.stack) || "",
+      url: window.location.href,
+      project,
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+    }).catch(() => {})
+  });
+
+  window.addEventListener("unhandledrejection", (event) => {
+    const project = localStorage.getItem("opencode-q-last-project") || ""
+    postError({
+      message: event.reason?.message || String(event.reason || "Unhandled Promise Rejection"),
+      stack: event.reason?.stack || "",
+      url: window.location.href,
+      project,
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+    }).catch(() => {})
+  });
+}
