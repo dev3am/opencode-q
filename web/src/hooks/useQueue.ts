@@ -10,8 +10,10 @@ export function useQueue(baseDir: string, sessionId: string) {
     if (!baseDir) return
     try {
       const data = await api.fetchQueue(baseDir, sessionId)
-      setItems(data.items)
-    } catch {}
+      setItems(data.items ?? [])
+    } catch {
+      setItems([])
+    }
   }, [baseDir, sessionId])
 
   useEffect(() => { fetchItems() }, [fetchItems])
