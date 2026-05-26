@@ -1,6 +1,6 @@
 {
   "name": "opencode-q",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Prompt queue plugin for OpenCode",
   "keywords": [
     "opencode",
@@ -24,6 +24,7 @@
     "scripts/"
   ],
   "scripts": {
+    "preuninstall": "node scripts/preuninstall.cjs",
     "postinstall": "node scripts/postinstall.cjs",
     "build": "bun run build:plugin && bun run build:cli && bun run build:web",
     "build:plugin": "bun build src/plugin.ts --outfile dist/plugin.js --target bun",
