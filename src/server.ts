@@ -370,8 +370,11 @@ export function createHandler(config: ServerConfig) {
       if (idx === -1) { jsonResponse(res, { error: "Item not found" }, 404); return }
       const [item] = data.items.splice(idx, 1)
       Storage.save(baseDir, sid, data)
-      if (project.sdkClient) {
-        const rid = resolveSessionId(project, sid)
+      const rid = resolveSessionId(project, sid)
+      const sessionMapped = rid !== sid
+      if (project.callbackUrl && (!sessionMapped || !project.sdkClient)) {
+        executeViaCallback(project, sid, item)
+      } else if (project.sdkClient) {
         serverLog(`execute: alias=${sid}, real=${rid}, text="${item.text.slice(0, 50)}"`)
         project.sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: item.text }] } })
           .then(() => { broadcast("queue-updated", { baseDir, sessionId: sid }) })
@@ -382,8 +385,6 @@ export function createHandler(config: ServerConfig) {
             broadcast("queue-updated", { baseDir, sessionId: sid })
             broadcast("session-status", { baseDir, status: "error", sessionId: sid, message: String(err) })
           })
-      } else if (project.callbackUrl) {
-        executeViaCallback(project, sid, item)
       } else {
         data.items.unshift(item); Storage.save(baseDir, sid, data); jsonResponse(res, { error: "SDK not available" }, 503); return
       }
@@ -400,8 +401,11 @@ export function createHandler(config: ServerConfig) {
       const { baseDir, project } = rp
       const item = QM.dequeue(baseDir, sid)
       if (!item) { jsonResponse(res, { executed: false }); return }
-      if (project.sdkClient) {
-        const rid = resolveSessionId(project, sid)
+      const rid = resolveSessionId(project, sid)
+      const sessionMapped = rid !== sid
+      if (project.callbackUrl && (!sessionMapped || !project.sdkClient)) {
+        executeViaCallback(project, sid, item)
+      } else if (project.sdkClient) {
         serverLog(`next: alias=${sid}, real=${rid}`)
         project.sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: item.text }] } })
           .then(() => { broadcast("queue-updated", { baseDir, sessionId: sid }) })
@@ -412,8 +416,6 @@ export function createHandler(config: ServerConfig) {
             broadcast("queue-updated", { baseDir, sessionId: sid })
             broadcast("session-status", { baseDir, status: "error", sessionId: sid, message: String(err) })
           })
-      } else if (project.callbackUrl) {
-        executeViaCallback(project, sid, item)
       } else {
         QM.reinsertAtFront(baseDir, sid, item); jsonResponse(res, { error: "SDK not available" }, 503); return
       }
@@ -433,9 +435,12 @@ export function createHandler(config: ServerConfig) {
       if (!failed) { jsonResponse(res, { error: "No failed item" }, 404); return }
       if (failed.retryCount >= 3) { jsonResponse(res, { error: "Max retries exceeded", item: failed.item }, 429); return }
       const failedItem = { ...failed.item }
-      if (project.sdkClient) {
-        const rid2 = resolveSessionId(project, sid)
-        project.sdkClient.prompt({ path: { id: rid2 }, body: { parts: [{ type: "text", text: failed.item.text }] } })
+      const rid = resolveSessionId(project, sid)
+      const sessionMapped = rid !== sid
+      if (project.callbackUrl && (!sessionMapped || !project.sdkClient)) {
+        executeViaCallback(project, sid, failed.item)
+      } else if (project.sdkClient) {
+        project.sdkClient.prompt({ path: { id: rid }, body: { parts: [{ type: "text", text: failed.item.text }] } })
           .then(() => {
             const ss = project.sessions.get(sid)
             if (ss) { ss.failedItem = undefined; ss.status = "idle" }
@@ -445,8 +450,6 @@ export function createHandler(config: ServerConfig) {
             const ss = project.sessions.get(sid)
             if (ss?.failedItem) ss.failedItem.retryCount++
           })
-      } else if (project.callbackUrl) {
-        executeViaCallback(project, sid, failed.item)
       } else {
         jsonResponse(res, { error: "SDK not available" }, 503); return
       }
