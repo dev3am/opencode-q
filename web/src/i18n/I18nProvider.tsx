@@ -1,20 +1,23 @@
-import { useState, useCallback, type ReactNode } from "react"
-import { I18nContext, detectLang } from "./useTranslation"
-import { translations, type Lang } from "./translations"
+import { type ReactNode, useCallback, useState } from "react";
+import { type Lang, translations } from "./translations";
+import { detectLang, I18nContext } from "./useTranslation";
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(detectLang)
+	const [lang, setLangState] = useState<Lang>(detectLang);
 
-  const setLang = useCallback((l: Lang) => {
-    setLangState(l)
-    localStorage.setItem("opencode-q-lang", l)
-  }, [])
+	const setLang = useCallback((l: Lang) => {
+		setLangState(l);
+		localStorage.setItem("opencode-q-lang", l);
+	}, []);
 
-  const t = useCallback((key: string) => translations[lang][key] || key, [lang])
+	const t = useCallback(
+		(key: string) => translations[lang][key] || key,
+		[lang],
+	);
 
-  return (
-    <I18nContext.Provider value={{ lang, setLang, t }}>
-      {children}
-    </I18nContext.Provider>
-  )
+	return (
+		<I18nContext.Provider value={{ lang, setLang, t }}>
+			{children}
+		</I18nContext.Provider>
+	);
 }
