@@ -12,6 +12,7 @@ interface Props {
 	online: boolean;
 	onSend: (id: string) => void;
 	onResend: (id: string) => void;
+	onEdit: (id: string, text: string) => void;
 	onRemove: (id: string) => void;
 	onReorder: (from: number, to: number) => void;
 }
@@ -22,6 +23,7 @@ export default function QueueList({
 	online,
 	onSend,
 	onResend,
+	onEdit,
 	onRemove,
 	onReorder,
 }: Props) {
@@ -46,6 +48,7 @@ export default function QueueList({
 							canSend={online && !inFlight}
 							onSend={onSend}
 							onResend={onResend}
+							onEdit={onEdit}
 							onRemove={onRemove}
 						/>
 					))}

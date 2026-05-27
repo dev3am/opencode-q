@@ -82,6 +82,11 @@ export default function App() {
 								api.resendItem(project.baseDir, session!.sessionId, id),
 							)
 						}
+						onEdit={(id, text) =>
+							act(() =>
+								api.updateItem(project.baseDir, session!.sessionId, id, text),
+							)
+						}
 						onRemove={(id) =>
 							act(() => api.removeItem(project.baseDir, session!.sessionId, id))
 						}

@@ -24,6 +24,42 @@ For local development, point your `opencode.json` at the built plugin:
 
 Then start OpenCode and open `http://localhost:4321`.
 
+### Developer mode (you installed via `npm i -g opencode-q`)
+
+A running OpenCode loads the plugin from `~/.config/opencode/plugins/`
+(`opencode-q.js` + `web/`), **not** from this repo's `dist/`. So editing the
+source and rebuilding is not enough — your build has to land in that runtime
+directory (or you preview it elsewhere). Two dev loops; pick whichever fits
+what you're changing (it's a convenience choice):
+
+**Option 1 — `bun run reload`** (covers everything, verifies the real artifact)
+
+```bash
+bun run reload   # build (plugin + web), then sync dist/ → ~/.config/opencode/plugins/
+```
+
+- After the sync, depending on what you changed:
+  - **Web (UI) changes** → just refresh `http://localhost:4321` in the browser
+    (the web host reads files from disk per request, so no restart is needed).
+  - **Plugin (server) changes** → restart OpenCode to reload `opencode-q.js`
+    (the plugin API has no teardown/reload hook, so this step is manual).
+- It does **not** watch files and is **not** a one-time setup — re-run it after
+  *every* change you want to see:
+  `edit → bun run reload → refresh :4321 (web) / restart OpenCode (server) → repeat`.
+
+**Option 2 — Vite dev server** (fast hot-reload, **frontend only**)
+
+```bash
+cd web && bunx vite   # http://localhost:5173, proxies /api → :4321
+```
+
+- Edit `web/src` and the browser updates automatically — no per-change command.
+- Best for tight UI iteration. Caveats: it serves on `:5173` (not `:4321`) and
+  is **not** the production bundle, and it does **not** cover plugin/server
+  changes — those still need Option 1 (`bun run reload` + restart).
+- Recommended even if you use this: do a final `bun run reload` check on
+  `:4321` against the real built artifact before opening a PR.
+
 ## Architecture (web-only, disk-as-truth)
 
 opencode-q is a **web-only** plugin. There is no CLI and no TUI command surface. State lives entirely on disk; the `:4321` web host is stateless.
@@ -44,7 +80,9 @@ Browser ──HTTP/poll──▶ Web host (:4321) ──read/write──▶  DIS
 bun install      # install dependencies
 bun run build    # build all (plugin + web)
 bun test         # run tests
+bun run lint     # biome check (src, web/src, scripts)
 bun run dev      # build only
+bun run reload   # build + sync into ~/.config/opencode/plugins (see Developer mode)
 ```
 
 ## Project Structure
