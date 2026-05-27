@@ -1,38 +1,15 @@
-const {
-	readFileSync,
-	writeFileSync,
-	existsSync,
-	mkdirSync,
-	cpSync,
-	rmSync,
-} = require("node:fs");
-const { join, resolve } = require("node:path");
-const { homedir } = require("node:os");
-
-const PLUGIN_NAME = "opencode-q";
-const configDir = join(homedir(), ".config", "opencode");
-const pluginsDir = join(configDir, "plugins");
-const source = resolve(__dirname, "..", "dist", "plugin.js");
-const dest = join(pluginsDir, `${PLUGIN_NAME}.js`);
-const webSource = resolve(__dirname, "..", "dist", "web");
-const webDest = join(pluginsDir, "web");
+const { existsSync, rmSync } = require("node:fs");
+const { join } = require("node:path");
+const { syncRuntime } = require("./sync-runtime.cjs");
 
 try {
-	if (!existsSync(source)) {
-		console.warn(`opencode-q: ${source} not found — skipping plugin install`);
+	const r = syncRuntime();
+	if (r.skipped) {
+		console.warn(`opencode-q: ${r.reason} — skipping plugin install`);
 		process.exit(0);
 	}
-
-	if (!existsSync(pluginsDir)) mkdirSync(pluginsDir, { recursive: true });
-
-	writeFileSync(dest, readFileSync(source, "utf-8"), "utf-8");
-	console.log(`opencode-q: plugin installed to ${dest}`);
-
-	if (existsSync(webSource)) {
-		if (existsSync(webDest)) rmSync(webDest, { recursive: true, force: true });
-		cpSync(webSource, webDest, { recursive: true });
-		console.log(`opencode-q: web UI copied to ${webDest}`);
-	}
+	console.log(`opencode-q: plugin installed to ${r.pluginDest}`);
+	if (r.web) console.log(`opencode-q: web UI copied to ${r.webDest}`);
 
 	const cmdDir = join(process.cwd(), ".opencode", "commands");
 	if (existsSync(join(cmdDir, "q-add.md"))) {
