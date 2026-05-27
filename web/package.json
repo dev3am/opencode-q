@@ -1,12 +1,12 @@
 {
-  "name": "opencode-q-web",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "build": "vite build"
-  },
-  "devDependencies": {
-    "@tailwindcss/vite": "^4.3.0",
-    "tailwindcss": "^4.3.0"
-  }
+	"name": "opencode-q-web",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "vite build"
+	},
+	"devDependencies": {
+		"@tailwindcss/vite": "^4.3.0",
+		"tailwindcss": "^4.3.0"
+	}
 }

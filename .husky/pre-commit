@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# 현재 체크아웃된 브랜치명을 가져옴
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# main 브랜치인 경우 커밋을 사전 차단
+if [ "$CURRENT_BRANCH" = "main" ]; then
+  echo "❌ Error: [TBD Workflow] 'main' 브랜치에 직접 커밋할 수 없습니다."
+  echo "👉 새로운 피처 브랜치(feature/...)를 생성하여 작업하고 PR을 사용해 주세요."
+  exit 1
+fi
+
+# 린트 검증 (Biome)
+bun run lint
+
+# 커밋 전 테스트 실행 (TDD 검증)
+bun test
