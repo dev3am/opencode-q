@@ -31,7 +31,10 @@ export interface PluginRuntimeDeps {
 	registerable?: boolean;
 }
 
-export function createPluginRuntime(deps: PluginRuntimeDeps) {
+export function createPluginRuntime(
+	deps: PluginRuntimeDeps,
+	validSessionIds: Set<string>,
+) {
 	const { baseDir, instanceId, executor } = deps;
 	const registerable = deps.registerable !== false;
 	const sessions = new Map<string, SessionInfo>();
@@ -56,6 +59,7 @@ export function createPluginRuntime(deps: PluginRuntimeDeps) {
 				updatedAt: meta?.updatedAt ?? new Date().toISOString(),
 			});
 			migrateLegacyDefault(baseDir, sid);
+			validSessionIds.add(sid);
 		} else if (meta) {
 			sessions.set(sid, {
 				...existing,
@@ -63,6 +67,7 @@ export function createPluginRuntime(deps: PluginRuntimeDeps) {
 				createdAt: meta.createdAt ?? existing.createdAt,
 				updatedAt: meta.updatedAt ?? existing.updatedAt,
 			});
+			validSessionIds.add(sid);
 		}
 		executor.noteSession(sid, sessions.get(sid)!.status);
 	}
@@ -83,10 +88,11 @@ export function createPluginRuntime(deps: PluginRuntimeDeps) {
 				return;
 			}
 			const info = event?.properties?.info;
-			if (info?.parentID) return; // filter child/subagent sessions
+			if (info?.parentID) return;
 
 			const sid: string | undefined = event?.properties?.sessionID ?? info?.id;
 			if (!sid) return;
+			if (!info && !validSessionIds.has(sid)) return;
 
 			const meta = info
 				? {
@@ -148,6 +154,7 @@ export async function discoverSessions(
 		meta?: { title?: string; createdAt?: string; updatedAt?: string },
 	) => void,
 	noteBusy: (id: string) => void,
+	validSessionIds: Set<string>,
 	opts: DiscoverOpts = {},
 ): Promise<boolean> {
 	const attempts = opts.attempts ?? 3;
@@ -160,6 +167,7 @@ export async function discoverSessions(
 			]);
 			for (const s of list) {
 				if (!s.id || s.parentID) continue;
+				validSessionIds.add(s.id);
 				seeSession(s.id, {
 					title: s.title ?? "",
 					createdAt:
@@ -210,12 +218,17 @@ export const OpenCodeQ = (async ({ client, directory }: any) => {
 	});
 	if (registerable) executor.start();
 
-	const runtime = createPluginRuntime({
-		baseDir,
-		instanceId,
-		executor,
-		registerable,
-	}); // prettier-ignore
+	const validSessionIds = new Set<string>();
+
+	const runtime = createPluginRuntime(
+		{
+			baseDir,
+			instanceId,
+			executor,
+			registerable,
+		},
+		validSessionIds,
+	);
 
 	// Run session discovery asynchronously to avoid blocking OpenCode startup deadlock
 	if (registerable) {
@@ -223,6 +236,7 @@ export const OpenCodeQ = (async ({ client, directory }: any) => {
 			client,
 			(id, meta) => runtime.seeSession(id, meta),
 			(id) => executor.noteSession(id, "busy"),
+			validSessionIds,
 		).then((ok) => {
 			if (ok) runtime.persist();
 		});

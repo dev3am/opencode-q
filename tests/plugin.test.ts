@@ -21,14 +21,22 @@ afterEach(() => {
 
 function makeRuntime(prompt = async () => {}) {
 	const executor = createExecutor({ baseDir: proj, prompt });
-	const rt = createPluginRuntime({ baseDir: proj, instanceId: "i1", executor });
+	const rt = createPluginRuntime(
+		{ baseDir: proj, instanceId: "i1", executor },
+		new Set(),
+	);
 	return { rt, executor };
 }
 
-test("a session event registers the session in the registry", async () => {
+test("a session.created event registers the session in the registry", async () => {
 	const { rt } = makeRuntime();
 	await rt.event({
-		event: { type: "session.idle", properties: { sessionID: "ses1" } },
+		event: {
+			type: "session.created",
+			properties: {
+				info: { id: "ses1", title: "t", time: { created: 1, updated: 2 } },
+			},
+		},
 	});
 	const rec = R.readAllProjects().find((r) => r.baseDir === proj)!;
 	expect(rec.sessions.map((s) => s.sessionId)).toContain("ses1");
@@ -36,6 +44,14 @@ test("a session event registers the session in the registry", async () => {
 
 test("session.idle completes the in-flight sent item", async () => {
 	const { rt } = makeRuntime();
+	await rt.event({
+		event: {
+			type: "session.created",
+			properties: {
+				info: { id: "ses1", title: "t", time: { created: 1, updated: 2 } },
+			},
+		},
+	});
 	const item = S.addItem(proj, "ses1", "x");
 	S.setStatus(proj, "ses1", item.id, "sent");
 	await rt.event({
@@ -46,6 +62,14 @@ test("session.idle completes the in-flight sent item", async () => {
 
 test("session.error marks the in-flight item failed", async () => {
 	const { rt } = makeRuntime();
+	await rt.event({
+		event: {
+			type: "session.created",
+			properties: {
+				info: { id: "ses1", title: "t", time: { created: 1, updated: 2 } },
+			},
+		},
+	});
 	const item = S.addItem(proj, "ses1", "x");
 	S.setStatus(proj, "ses1", item.id, "sent");
 	await rt.event({
@@ -61,7 +85,16 @@ test("first sight of a session migrates legacy queue-default.json", async () => 
 	S.addItem(proj, "default", "legacy");
 	const { rt } = makeRuntime();
 	await rt.event({
-		event: { type: "session.idle", properties: { sessionID: "ses-real" } },
+		event: {
+			type: "session.created",
+			properties: {
+				info: {
+					id: "ses-real",
+					title: "t",
+					time: { created: 1, updated: 2 },
+				},
+			},
+		},
 	});
 	expect(S.loadQueue(proj, "ses-real").items.map((i) => i.text)).toEqual([
 		"legacy",
@@ -70,12 +103,15 @@ test("first sight of a session migrates legacy queue-default.json", async () => 
 
 test("an excluded baseDir (home/root) does NOT write a registry record", async () => {
 	const executor = createExecutor({ baseDir: proj, prompt: async () => {} });
-	const rt = createPluginRuntime({
-		baseDir: proj,
-		instanceId: "i1",
-		executor,
-		registerable: false,
-	});
+	const rt = createPluginRuntime(
+		{
+			baseDir: proj,
+			instanceId: "i1",
+			executor,
+			registerable: false,
+		},
+		new Set(),
+	);
 	await rt.event({
 		event: { type: "session.idle", properties: { sessionID: "ses1" } },
 	});
@@ -85,14 +121,22 @@ test("an excluded baseDir (home/root) does NOT write a registry record", async (
 
 test("a registerable runtime DOES write a record", async () => {
 	const executor = createExecutor({ baseDir: proj, prompt: async () => {} });
-	const rt = createPluginRuntime({
-		baseDir: proj,
-		instanceId: "i1",
-		executor,
-		registerable: true,
-	});
+	const rt = createPluginRuntime(
+		{
+			baseDir: proj,
+			instanceId: "i1",
+			executor,
+			registerable: true,
+		},
+		new Set(),
+	);
 	await rt.event({
-		event: { type: "session.idle", properties: { sessionID: "ses1" } },
+		event: {
+			type: "session.created",
+			properties: {
+				info: { id: "ses1", title: "t", time: { created: 1, updated: 2 } },
+			},
+		},
 	});
 	expect(R.readAllProjects()).toHaveLength(1);
 });
@@ -145,7 +189,12 @@ test("child sessions (with parentID) are NOT registered", async () => {
 test("server.instance.disposed marks this instance offline immediately", async () => {
 	const { rt } = makeRuntime();
 	await rt.event({
-		event: { type: "session.idle", properties: { sessionID: "ses1" } },
+		event: {
+			type: "session.created",
+			properties: {
+				info: { id: "ses1", title: "t", time: { created: 1, updated: 2 } },
+			},
+		},
 	});
 	expect(R.isOnline(R.readAllProjects()[0])).toBe(true);
 	await rt.event({
@@ -156,7 +205,7 @@ test("server.instance.disposed marks this instance offline immediately", async (
 	});
 	const rec = R.readAllProjects()[0];
 	expect(R.isOnline(rec)).toBe(false);
-	expect(rec.sessions.map((s) => s.sessionId)).toContain("ses1"); // sessions preserved
+	expect(rec.sessions.map((s) => s.sessionId)).toContain("ses1");
 });
 
 test("discoverSessions retries on failure then succeeds", async () => {
@@ -179,6 +228,7 @@ test("discoverSessions retries on failure then succeeds", async () => {
 		client as any,
 		(id: string, meta: any) => seen.push(id),
 		() => {},
+		new Set(),
 		{ attempts: 3, delayMs: 0 },
 	);
 	expect(ok).toBe(true);
