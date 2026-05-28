@@ -30,7 +30,7 @@ export const translations: Record<Lang, Record<string, string>> = {
 		"quickbar.cancel": "취소",
 		"quickbar.done": "완료",
 		"quickbar.editMode": "편집 모드",
-		"quickbar.placeholder": "버튼 이름",
+		"quickbar.placeholder": "입력...",
 	},
 	en: {
 		"app.title": "opencode-q",
@@ -61,7 +61,7 @@ export const translations: Record<Lang, Record<string, string>> = {
 		"quickbar.cancel": "Cancel",
 		"quickbar.done": "Done",
 		"quickbar.editMode": "Edit mode",
-		"quickbar.placeholder": "Button name",
+		"quickbar.placeholder": "Enter...",
 	},
 	ja: {
 		"app.title": "opencode-q",
@@ -92,7 +92,7 @@ export const translations: Record<Lang, Record<string, string>> = {
 		"quickbar.cancel": "キャンセル",
 		"quickbar.done": "完了",
 		"quickbar.editMode": "編集モード",
-		"quickbar.placeholder": "ボタン名",
+		"quickbar.placeholder": "入力...",
 	},
 	zh: {
 		"app.title": "opencode-q",
@@ -123,6 +123,6 @@ export const translations: Record<Lang, Record<string, string>> = {
 		"quickbar.cancel": "取消",
 		"quickbar.done": "完成",
 		"quickbar.editMode": "编辑模式",
-		"quickbar.placeholder": "按钮名称",
+		"quickbar.placeholder": "输入...",
 	},
 };
