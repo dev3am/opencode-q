@@ -10,3 +10,4 @@ docs/
 AGENTS.md
 COMPOUND.md
 package-lock.json
+.superpowers/
