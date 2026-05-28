@@ -60,7 +60,21 @@ export default function QuickBar({ onAdd }: QuickBarProps) {
 		setEditingId(null);
 	}
 
-	if (buttons.length === 0 && !editing) return null;
+	if (buttons.length === 0 && !editing) {
+		return (
+			<div className="flex items-center gap-1.5 shrink-0 mb-3 px-1 py-2 rounded-lg border bg-gray-50 border-gray-200">
+				<span className="text-[10px] uppercase tracking-wide mr-1 text-gray-400">
+					{t("quickbar.label")}
+				</span>
+				<button
+					onClick={() => setEditing(true)}
+					className="px-2 py-1 text-xs rounded-md border border-dashed border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-500"
+				>
+					+ {t("quickbar.add")}
+				</button>
+			</div>
+		);
+	}
 
 	return (
 		<div
