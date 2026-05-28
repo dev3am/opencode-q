@@ -10,7 +10,7 @@ import {
 import * as R from "./registry";
 import * as S from "./storage";
 
-const VERSION = "1.1.0";
+const VERSION = "1.1.3";
 
 const MIME: Record<string, string> = {
 	".html": "text/html",
