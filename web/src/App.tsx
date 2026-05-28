@@ -20,12 +20,17 @@ export default function App() {
 		() => projects.find((p) => p.baseDir === selBase) || projects[0],
 		[projects, selBase],
 	);
-	const session = useMemo(
-		() =>
-			project?.sessions.find((s) => s.sessionId === selSession) ||
-			project?.sessions[0],
-		[project, selSession],
-	);
+	const session = useMemo(() => {
+		if (!project) return undefined;
+		const found = project.sessions.find((s) => s.sessionId === selSession);
+		if (found) return found;
+		const sorted = [...project.sessions].sort(
+			(a, b) =>
+				(Date.parse(b.updatedAt ?? "") || 0) -
+				(Date.parse(a.updatedAt ?? "") || 0),
+		);
+		return sorted[0];
+	}, [project, selSession]);
 	const inFlight = !!session?.items.some(
 		(i) => i.status === "pending" || i.status === "sent",
 	);

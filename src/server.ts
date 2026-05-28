@@ -49,19 +49,27 @@ function readBody(req: http.IncomingMessage): Promise<any> {
 
 function buildState() {
 	const now = Date.now();
+	const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 	const groups = R.groupByBaseDir(R.readAllProjects(), now);
 	const projects = groups
 		.map((g) => ({
 			baseDir: g.baseDir,
 			online: g.online,
-			sessions: g.sessions.map((s) => ({
-				sessionId: s.sessionId,
-				status: s.status,
-				title: s.title ?? "",
-				createdAt: s.createdAt ?? "",
-				updatedAt: s.updatedAt ?? "",
-				items: S.loadQueue(g.baseDir, s.sessionId).items,
-			})),
+			sessions: g.sessions
+				.map((s) => ({
+					sessionId: s.sessionId,
+					status: s.status,
+					title: s.title ?? "",
+					createdAt: s.createdAt ?? "",
+					updatedAt: s.updatedAt ?? "",
+					items: S.loadQueue(g.baseDir, s.sessionId).items,
+				}))
+				.filter((s) => {
+					if (s.items.length > 0) return true;
+					const t = Date.parse(s.updatedAt);
+					if (Number.isFinite(t) && now - t > THIRTY_DAYS_MS) return false;
+					return true;
+				}),
 		}))
 		.filter(
 			(p) =>
