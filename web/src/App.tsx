@@ -4,6 +4,7 @@ import AddPrompt from "./components/AddPrompt";
 import EmptyState from "./components/EmptyState";
 import ProjectSidebar from "./components/ProjectSidebar";
 import QueueList from "./components/QueueList";
+import QuickBar from "./components/QuickBar";
 import Toast from "./components/Toast";
 import { usePolling } from "./hooks/usePolling";
 import { useTranslation } from "./i18n/useTranslation";
@@ -53,7 +54,7 @@ export default function App() {
 		return <div className="p-6 text-gray-500">{t("empty.noProjects")}</div>;
 
 	return (
-		<div className="flex min-h-screen">
+		<div className="flex h-screen overflow-hidden">
 			<ProjectSidebar
 				projects={projects}
 				selectedBaseDir={project.baseDir}
@@ -64,39 +65,50 @@ export default function App() {
 				}}
 				onSelectSession={setSelSession}
 			/>
-			<div className="flex-1 p-4">
-				{!session || session.items.length === 0 ? (
-					<EmptyState />
-				) : (
-					<QueueList
-						items={session.items}
-						inFlight={inFlight}
-						online={project.online}
-						onSend={(id) =>
-							actSend(() =>
-								api.sendItem(project.baseDir, session!.sessionId, id),
-							)
-						}
-						onResend={(id) =>
-							actSend(() =>
-								api.resendItem(project.baseDir, session!.sessionId, id),
-							)
-						}
-						onEdit={(id, text) =>
-							act(() =>
-								api.updateItem(project.baseDir, session!.sessionId, id, text),
-							)
-						}
-						onRemove={(id) =>
-							act(() => api.removeItem(project.baseDir, session!.sessionId, id))
-						}
-						onReorder={(from, to) =>
-							act(() =>
-								api.reorder(project.baseDir, session!.sessionId, from, to),
-							)
+			<div className="flex-1 flex flex-col p-4 min-w-0">
+				{session && (
+					<QuickBar
+						onAdd={(text) =>
+							act(() => api.addItem(project.baseDir, session.sessionId, text))
 						}
 					/>
 				)}
+				<div className="flex-1 overflow-y-auto min-h-0">
+					{!session || session.items.length === 0 ? (
+						<EmptyState />
+					) : (
+						<QueueList
+							items={session.items}
+							inFlight={inFlight}
+							online={project.online}
+							onSend={(id) =>
+								actSend(() =>
+									api.sendItem(project.baseDir, session!.sessionId, id),
+								)
+							}
+							onResend={(id) =>
+								actSend(() =>
+									api.resendItem(project.baseDir, session!.sessionId, id),
+								)
+							}
+							onEdit={(id, text) =>
+								act(() =>
+									api.updateItem(project.baseDir, session!.sessionId, id, text),
+								)
+							}
+							onRemove={(id) =>
+								act(() =>
+									api.removeItem(project.baseDir, session!.sessionId, id),
+								)
+							}
+							onReorder={(from, to) =>
+								act(() =>
+									api.reorder(project.baseDir, session!.sessionId, from, to),
+								)
+							}
+						/>
+					)}
+				</div>
 				{session && (
 					<AddPrompt
 						onAdd={(text) =>

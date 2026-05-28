@@ -27,7 +27,7 @@ export default function ProjectSidebar({
 	const now = Date.now();
 
 	return (
-		<div className="flex flex-col w-72 shrink-0 bg-gray-50 h-screen overflow-y-auto">
+		<div className="flex flex-col w-72 shrink-0 bg-gray-50 overflow-y-auto">
 			<div className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-sm px-3 pt-3 pb-2">
 				<div className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">
 					Projects
