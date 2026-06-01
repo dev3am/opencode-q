@@ -7,8 +7,10 @@ import { PENDING_TIMEOUT_MS, STALE_CLEANUP_MS } from "../src/constants";
 import * as R from "../src/registry";
 import { createRequestHandler, runSweep } from "../src/server";
 import * as S from "../src/storage";
+import type { ProcessCwdResolver } from "../src/types";
 
 let home: string, proj: string, server: http.Server, port: number;
+let resolveProcessCwd: ProcessCwdResolver;
 
 function req(
 	method: string,
@@ -52,10 +54,23 @@ beforeEach(async () => {
 	home = mkdtempSync(join(tmpdir(), "oq-srv-home-"));
 	proj = mkdtempSync(join(tmpdir(), "oq-srv-proj-"));
 	process.env.OPENCODE_Q_HOME = home;
-	server = http.createServer(createRequestHandler({ webDir: undefined }));
+	resolveProcessCwd = () => ({ ok: true, cwd: proj });
+	server = http.createServer(
+		createRequestHandler({
+			webDir: undefined,
+			visibleRecordOptions: {
+				resolveProcessCwd: (pid) => resolveProcessCwd(pid),
+			},
+		}),
+	);
 	await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
 	port = (server.address() as any).port;
-	R.touchHeartbeat(proj, [{ sessionId: "ses1", status: "idle" }], "i1");
+	R.touchHeartbeat(proj, [{ sessionId: "ses1", status: "idle" }], "i1", {
+		pid: 111,
+		cwd: proj,
+		startedAt: new Date().toISOString(),
+		version: "1.1.4",
+	});
 });
 afterEach(() => {
 	server.close();
@@ -133,7 +148,7 @@ test("offline project with NO live items is excluded from /api/state", async () 
 	expect(res.json.projects.some((p: any) => p.baseDir === "/gone")).toBe(false);
 });
 
-test("offline project WITH live items is shown gray (online:false)", async () => {
+test("offline project WITH live items is hidden from /api/state", async () => {
 	const gone = mkdtempSync(join(tmpdir(), "oq-gone-"));
 	try {
 		R.writeProjectRecord({
@@ -141,21 +156,32 @@ test("offline project WITH live items is shown gray (online:false)", async () =>
 			sessions: [{ sessionId: "s", status: "idle" }],
 			heartbeat: new Date(Date.now() - 999999).toISOString(),
 			instanceId: "old",
+			pid: 999,
+			cwd: gone,
+			startedAt: new Date().toISOString(),
+			version: "1.1.4",
 		});
 		S.addItem(gone, "s", "preserved");
 		const res = await req("GET", "/api/state");
-		const p = res.json.projects.find((x: any) => x.baseDir === gone);
-		expect(p).toBeTruthy();
-		expect(p.online).toBe(false);
-		expect(p.sessions[0].items[0].text).toBe("preserved");
+		expect(res.json.projects.some((x: any) => x.baseDir === gone)).toBe(false);
 	} finally {
 		rmSync(gone, { recursive: true, force: true });
 	}
 });
 
 test("two instances of one baseDir collapse to a single project", async () => {
-	R.touchHeartbeat(proj, [{ sessionId: "ses1", status: "idle" }], "i1");
-	R.touchHeartbeat(proj, [{ sessionId: "ses2", status: "idle" }], "i2");
+	R.touchHeartbeat(proj, [{ sessionId: "ses1", status: "idle" }], "i1", {
+		pid: 111,
+		cwd: proj,
+		startedAt: new Date().toISOString(),
+		version: "1.1.4",
+	});
+	R.touchHeartbeat(proj, [{ sessionId: "ses2", status: "idle" }], "i2", {
+		pid: 112,
+		cwd: proj,
+		startedAt: new Date().toISOString(),
+		version: "1.1.4",
+	});
 	const res = await req("GET", "/api/state");
 	const matches = res.json.projects.filter((x: any) => x.baseDir === proj);
 	expect(matches).toHaveLength(1);
@@ -163,6 +189,36 @@ test("two instances of one baseDir collapse to a single project", async () => {
 		"ses1",
 		"ses2",
 	]);
+});
+
+test("GET /api/state excludes a fresh record whose live cwd differs", async () => {
+	resolveProcessCwd = () => ({ ok: true, cwd: "/other" });
+	const res = await req("GET", "/api/state");
+	expect(res.status).toBe(200);
+	expect(res.json.projects.some((p: any) => p.baseDir === proj)).toBe(false);
+});
+
+test("GET /api/state ignores offline sessions when a live record exists", async () => {
+	R.writeProjectRecord({
+		baseDir: proj,
+		sessions: [{ sessionId: "old", status: "idle" }],
+		heartbeat: new Date(Date.now() - 999999).toISOString(),
+		instanceId: "old",
+		pid: 999,
+		cwd: proj,
+		startedAt: new Date().toISOString(),
+		version: "1.1.4",
+	});
+	const res = await req("GET", "/api/state");
+	const p = res.json.projects.find((x: any) => x.baseDir === proj);
+	expect(p.sessions.map((s: any) => s.sessionId)).toEqual(["ses1"]);
+});
+
+test("send rejects a heartbeat-fresh record whose live cwd differs", async () => {
+	resolveProcessCwd = () => ({ ok: true, cwd: "/other" });
+	const add = await req("POST", `${pq()}/items`, { text: "a" });
+	const res = await req("POST", `${pq()}/items/${add.json.item.id}/send`);
+	expect(res.status).toBe(409);
 });
 
 test("runSweep fails timed-out pending in an ONLINE project", () => {

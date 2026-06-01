@@ -11,6 +11,7 @@ import {
 	isExcludedBaseDir,
 	REELECTION_MS,
 	SWEEP_MS,
+	VERSION,
 } from "./constants";
 import { createExecutor } from "./executor";
 import { markInstanceOffline, touchHeartbeat } from "./registry";
@@ -29,6 +30,9 @@ export interface PluginRuntimeDeps {
 	instanceId: string;
 	executor: ReturnType<typeof createExecutor>;
 	registerable?: boolean;
+	pid?: number;
+	cwd?: string;
+	startedAt?: string;
 }
 
 export function createPluginRuntime(
@@ -37,11 +41,17 @@ export function createPluginRuntime(
 ) {
 	const { baseDir, instanceId, executor } = deps;
 	const registerable = deps.registerable !== false;
+	const diagnostics = {
+		pid: deps.pid ?? process.pid,
+		cwd: deps.cwd ?? process.cwd(),
+		startedAt: deps.startedAt ?? new Date().toISOString(),
+		version: VERSION,
+	};
 	const sessions = new Map<string, SessionInfo>();
 
 	function persist() {
 		if (!registerable) return;
-		touchHeartbeat(baseDir, [...sessions.values()], instanceId);
+		touchHeartbeat(baseDir, [...sessions.values()], instanceId, diagnostics);
 	}
 
 	function seeSession(
