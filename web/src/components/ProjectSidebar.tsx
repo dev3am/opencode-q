@@ -13,8 +13,24 @@ interface Props {
 const STATUS_DOT: Record<string, string> = {
 	busy: "bg-yellow-400",
 	idle: "bg-gray-300",
+	active: "bg-green-500",
 	error: "bg-red-400",
 };
+
+function activeSessionId(
+	sessions: ProjectState["sessions"],
+): string | undefined {
+	let best = "";
+	let bestT = 0;
+	for (const s of sessions) {
+		const t = Date.parse(s.updatedAt ?? "");
+		if (Number.isFinite(t) && t > bestT) {
+			bestT = t;
+			best = s.sessionId;
+		}
+	}
+	return best || undefined;
+}
 
 export default function ProjectSidebar({
 	projects,
@@ -64,37 +80,47 @@ export default function ProjectSidebar({
 
 							{isActiveProject && p.sessions.length > 0 && (
 								<div className="max-h-48 overflow-y-auto px-2 pb-2">
-									{sortSessionsByRecent(p.sessions).map((s) => {
-										const isActive = s.sessionId === selectedSessionId;
-										const label = s.title?.trim()
-											? s.title
-											: s.sessionId.slice(0, 8);
-										const when = formatRelativeTime(s.updatedAt, lang, now);
-										return (
-											<div
-												key={s.sessionId}
-												onClick={() => onSelectSession(s.sessionId)}
-												className={`px-2 py-1.5 rounded-md mb-0.5 cursor-pointer text-xs transition-colors ${isActive ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50 text-gray-600"}`}
-											>
-												<div className="flex items-center gap-2">
-													<div
-														className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[s.status] || "bg-gray-300"}`}
-													/>
-													<span
-														className="truncate flex-1"
-														title={s.title || s.sessionId}
-													>
-														{label}
-													</span>
-												</div>
-												{when && (
-													<div className="text-[10px] text-gray-400 mt-0.5 pl-3.5">
-														{when}
+									{(() => {
+										const activeId = p.online
+											? activeSessionId(p.sessions)
+											: undefined;
+										return sortSessionsByRecent(p.sessions).map((s) => {
+											const isActive = s.sessionId === selectedSessionId;
+											const isCurrentLive = s.sessionId === activeId;
+											const dot =
+												isCurrentLive && s.status === "idle"
+													? STATUS_DOT.active
+													: STATUS_DOT[s.status] || "bg-gray-300";
+											const label = s.title?.trim()
+												? s.title
+												: s.sessionId.slice(0, 8);
+											const when = formatRelativeTime(s.updatedAt, lang, now);
+											return (
+												<div
+													key={s.sessionId}
+													onClick={() => onSelectSession(s.sessionId)}
+													className={`px-2 py-1.5 rounded-md mb-0.5 cursor-pointer text-xs transition-colors ${isActive ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50 text-gray-600"}`}
+												>
+													<div className="flex items-center gap-2">
+														<div
+															className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`}
+														/>
+														<span
+															className="truncate flex-1"
+															title={s.title || s.sessionId}
+														>
+															{label}
+														</span>
 													</div>
-												)}
-											</div>
-										);
-									})}
+													{when && (
+														<div className="text-[10px] text-gray-400 mt-0.5 pl-3.5">
+															{when}
+														</div>
+													)}
+												</div>
+											);
+										});
+									})()}
 								</div>
 							)}
 						</div>
