@@ -29,10 +29,25 @@ export interface ProjectRecord {
 	sessions: SessionInfo[];
 	heartbeat: string;
 	instanceId: string;
+	pid?: number;
+	cwd?: string;
+	startedAt?: string;
+	version?: string;
 }
 
 export interface ProjectGroup {
 	baseDir: string;
 	online: boolean;
 	sessions: SessionInfo[];
+}
+
+export type ProcessCwdResult =
+	| { ok: true; cwd: string }
+	| { ok: false; reason: "dead" | "unavailable" | "error" };
+
+export type ProcessCwdResolver = (pid: number) => ProcessCwdResult;
+
+export interface VisibleRecordOptions {
+	resolveProcessCwd?: ProcessCwdResolver;
+	allowUnavailableFallback?: boolean;
 }

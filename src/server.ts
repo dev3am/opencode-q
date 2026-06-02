@@ -6,11 +6,11 @@ import {
 	HEALTH_SIGNATURE,
 	PENDING_TIMEOUT_MS,
 	STALE_CLEANUP_MS,
+	VERSION,
 } from "./constants";
 import * as R from "./registry";
 import * as S from "./storage";
-
-const VERSION = "1.1.3";
+import type { VisibleRecordOptions } from "./types";
 
 const MIME: Record<string, string> = {
 	".html": "text/html",
@@ -47,35 +47,33 @@ function readBody(req: http.IncomingMessage): Promise<any> {
 	});
 }
 
-function buildState() {
+function buildState(visibleRecordOptions: VisibleRecordOptions = {}) {
 	const now = Date.now();
 	const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-	const groups = R.groupByBaseDir(R.readAllProjects(), now);
-	const projects = groups
-		.map((g) => ({
-			baseDir: g.baseDir,
-			online: g.online,
-			sessions: g.sessions
-				.map((s) => ({
-					sessionId: s.sessionId,
-					status: s.status,
-					title: s.title ?? "",
-					createdAt: s.createdAt ?? "",
-					updatedAt: s.updatedAt ?? "",
-					items: S.loadQueue(g.baseDir, s.sessionId).items,
-				}))
-				.filter((s) => {
-					if (s.items.length > 0) return true;
-					const t = Date.parse(s.updatedAt);
-					if (Number.isFinite(t) && now - t > THIRTY_DAYS_MS) return false;
-					return true;
-				}),
-		}))
-		.filter(
-			(p) =>
-				p.online ||
-				p.sessions.some((s) => s.items.some((i) => S.isLiveStatus(i.status))),
-		);
+	const groups = R.groupVisibleByBaseDir(
+		R.readAllProjects(),
+		now,
+		visibleRecordOptions,
+	);
+	const projects = groups.map((g) => ({
+		baseDir: g.baseDir,
+		online: g.online,
+		sessions: g.sessions
+			.map((s) => ({
+				sessionId: s.sessionId,
+				status: s.status,
+				title: s.title ?? "",
+				createdAt: s.createdAt ?? "",
+				updatedAt: s.updatedAt ?? "",
+				items: S.loadQueue(g.baseDir, s.sessionId).items,
+			}))
+			.filter((s) => {
+				if (s.items.length > 0) return true;
+				const t = Date.parse(s.updatedAt);
+				if (Number.isFinite(t) && now - t > THIRTY_DAYS_MS) return false;
+				return true;
+			}),
+	}));
 	return { projects };
 }
 
@@ -102,8 +100,11 @@ export function runSweep(now: number = Date.now()): void {
 	}
 }
 
-export function createRequestHandler(opts: { webDir?: string }) {
-	const { webDir } = opts;
+export function createRequestHandler(opts: {
+	webDir?: string;
+	visibleRecordOptions?: VisibleRecordOptions;
+}) {
+	const { webDir, visibleRecordOptions = {} } = opts;
 
 	function serveStatic(urlPath: string, res: http.ServerResponse): boolean {
 		if (!webDir) return false;
@@ -137,7 +138,7 @@ export function createRequestHandler(opts: { webDir?: string }) {
 			if (p === "/health" && req.method === "GET")
 				return send(res, 200, { app: HEALTH_SIGNATURE, version: VERSION });
 			if (p === "/api/state" && req.method === "GET")
-				return send(res, 200, buildState());
+				return send(res, 200, buildState(visibleRecordOptions));
 
 			let m = p.match(
 				/^\/api\/projects\/([^/]+)\/sessions\/([^/]+)\/items\/([^/]+)\/(send|resend)$/,
@@ -146,9 +147,11 @@ export function createRequestHandler(opts: { webDir?: string }) {
 				const [, b, s, id] = m;
 				const baseDir = decodeURIComponent(b),
 					sid = decodeURIComponent(s);
-				const group = R.groupByBaseDir(R.readAllProjects()).find(
-					(g) => g.baseDir === baseDir,
-				);
+				const group = R.groupVisibleByBaseDir(
+					R.readAllProjects(),
+					Date.now(),
+					visibleRecordOptions,
+				).find((g) => g.baseDir === baseDir);
 				if (!group?.online)
 					return send(res, 409, { error: "인스턴스가 오프라인입니다" });
 				const item = S.sendItem(baseDir, sid, id);

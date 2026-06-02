@@ -9,6 +9,7 @@ export const ID_CHARSET = "0123456789abcdef";
 
 export const DEFAULT_PORT = 4321;
 export const HEALTH_SIGNATURE = "opencode-q";
+export const VERSION = "1.1.4";
 
 export const POLL_PENDING_MS = 750;
 export const HEARTBEAT_MS = 10_000;

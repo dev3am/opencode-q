@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { VERSION } from "../src/constants";
 import { createExecutor } from "../src/executor";
 import { createPluginRuntime } from "../src/plugin";
 import * as R from "../src/registry";
@@ -139,6 +140,28 @@ test("a registerable runtime DOES write a record", async () => {
 		},
 	});
 	expect(R.readAllProjects()).toHaveLength(1);
+});
+
+test("a registerable runtime writes pid cwd startedAt and version", async () => {
+	const executor = createExecutor({ baseDir: proj, prompt: async () => {} });
+	const rt = createPluginRuntime(
+		{
+			baseDir: proj,
+			instanceId: "i1",
+			executor,
+			registerable: true,
+			cwd: proj,
+			pid: 4321,
+			startedAt: "2026-06-02T00:00:00.000Z",
+		},
+		new Set(),
+	);
+	rt.persist();
+	const rec = R.readAllProjects()[0];
+	expect(rec.pid).toBe(4321);
+	expect(rec.cwd).toBe(proj);
+	expect(rec.startedAt).toBe("2026-06-02T00:00:00.000Z");
+	expect(rec.version).toBe(VERSION);
 });
 
 test("session.updated captures title and times into the registry", async () => {
